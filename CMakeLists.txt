@@ -30,7 +30,9 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
     )
 endif()
 
-set(lib_sources src/lab/core.cc)
+set(lib_sources src/lab/config.hh src/lab/Random/xoshiro256.hh
+                src/lab/Random/xoshiro256.cc src/lab/core.cc
+)
 
 find_package(
     Python ${PYTHON_VERSION} REQUIRED
@@ -83,6 +85,6 @@ target_include_directories(
            ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-find_package(Eigen3 REQUIRED NO_MODULE)
+find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 
 target_link_libraries(${target_name} PUBLIC Eigen3::Eigen)

@@ -60,9 +60,17 @@ nanobind_add_module(
 
 install(TARGETS ${target_name} LIBRARY DESTINATION kinetica)
 
-# nanobind_add_stub( mdca_stub MODULE ${target_name} OUTPUT
-# ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi PYTHON_PATH
-# $<TARGET_FILE_DIR:${target_name}> DEPENDS ${target_name} )
+nanobind_add_stub(
+    mdca_stub
+    MODULE
+    ${target_name}
+    OUTPUT
+    ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi
+    PYTHON_PATH
+    $<TARGET_FILE_DIR:${target_name}>
+    DEPENDS
+    ${target_name}
+)
 
 # Генерируем файл с макросами для экспорта функций
 include(GenerateExportHeader)

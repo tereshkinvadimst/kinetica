@@ -1,0 +1,46 @@
+# Терешкин В.С.
+# 2025
+---
+# Настройки базового стиля
+BasedOnStyle: Google
+TabWidth: 4
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 130
+---
+Language: Cpp
+Standard: Auto
+
+# Выравниевание
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+AlignConsecutiveDeclarations: AcrossEmptyLines
+
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
+
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 4
+
+BinPackArguments: false
+BinPackParameters: false
+
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma

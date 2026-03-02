@@ -1,0 +1,15 @@
+
+Checks: "google-*,\
+perfomance-*,\
+portability-*,\
+clang-analyzer-*,\
+misc-*,\
+-misc-non-private-member-variables-in-classes,\
+"
+CheckOptions:
+  - key:   modernize-use-default-member-init.UseAssignment
+    value: '1'
+  - key:   modernize-use-equals-default.IgnoreMacros
+    value: '0'
+  - key:   modernize-use-auto.MinTypeNameLength
+    value: '100'

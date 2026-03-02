@@ -1,0 +1,38 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 24,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "clang-base",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "on"
+            }
+        },
+        {
+            "name": "clang-debug",
+            "inherits": "clang-base",
+            "binaryDir": "${sourceDir}/build/Debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS": ""
+            }
+        },
+        {
+            "name": "clang-release",
+            "inherits": "clang-base",
+            "binaryDir": "${sourceDir}/build/Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "Kokkos_ENABLE_OPENMP": "On",
+                "CMAKE_CXX_FLAGS": ""
+            }
+        }
+    ]
+}

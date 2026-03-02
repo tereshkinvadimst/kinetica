@@ -58,17 +58,9 @@ nanobind_add_module(
 
 install(TARGETS ${target_name} LIBRARY DESTINATION kinetica)
 
-# nanobind_add_stub(
-#     mdca_stub
-#     MODULE
-#     ${target_name}
-#     OUTPUT
-#     ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi
-#     PYTHON_PATH
-#     $<TARGET_FILE_DIR:${target_name}>
-#     DEPENDS
-#     ${target_name}
-# )
+# nanobind_add_stub( mdca_stub MODULE ${target_name} OUTPUT
+# ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi PYTHON_PATH
+# $<TARGET_FILE_DIR:${target_name}> DEPENDS ${target_name} )
 
 # Генерируем файл с макросами для экспорта функций
 include(GenerateExportHeader)
@@ -91,4 +83,6 @@ target_include_directories(
            ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-target_link_libraries(${target_name} PUBLIC)
+find_package(Eigen3 REQUIRED NO_MODULE)
+
+target_link_libraries(${target_name} PUBLIC Eigen3::Eigen)

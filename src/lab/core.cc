@@ -51,5 +51,7 @@ NB_MODULE(_kinetica, m) {
         .def("applyPeriodicBoundaries", &mf::Domain::applyPeriodicBoundaries, "px"_a, "py"_a, "pz"_a)
         .def("moveParticles", &mf::Domain::moveParticles, "dt"_a)
         .def("collideParticles", &mf::Domain::collideParticles, "dt"_a)
-        .def("saveXYZ", &mf::Domain::saveXYZ, "file_name"_a);
+        .def("saveXYZ", &mf::Domain::saveXYZ, "file_name"_a)
+        .def("printStatsHeader", &mf::Domain::printStatsHeader)
+        .def("printStats", &mf::Domain::printStats, "time"_a);
 }

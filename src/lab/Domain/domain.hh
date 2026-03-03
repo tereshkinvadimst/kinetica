@@ -6,6 +6,8 @@
 #include "lab/Box/box.hh"
 #include "lab/CellList/cell_list.hh"
 #include "lab/Particles/particles.hh"
+#include "lab/Properties/flow_properties.hh"
+#include "lab/Properties/stats.hh"
 #include "lab/Random/xoshiro256.hh"
 
 namespace mf {
@@ -25,24 +27,29 @@ class Domain {
     void moveParticles(value_type dt);
     void collideParticles(value_type dt);
     void saveXYZ(std::string file_name) const;
+    void computeFlowProperties();
+    // void writeVTU(std::string file_name) const;
+    void printStatsHeader();
+    void printStats(value_type time);
 
    private:
     auto cellIndex(double x, double y, double z) -> size_type const;
 
    private:
-    xoshiro256          gen_;
-    Box                 domain_box_;
-    Particles           particles_;
-    size_type           n_cells_x_;
-    size_type           n_cells_y_;
-    size_type           n_cells_z_;
-    value_type          hx_;
-    value_type          hy_;
-    value_type          hz_;
-    value_type          avg_sigma_g_max_;
-    std::vector<Box>    cells_;
-    std::vector<double> sigma_g_max_;
-    CellList            cell_list_;
+    xoshiro256       gen_;
+    Box              domain_box_;
+    Particles        particles_;
+    size_type        n_cells_x_;
+    size_type        n_cells_y_;
+    size_type        n_cells_z_;
+    value_type       hx_;
+    value_type       hy_;
+    value_type       hz_;
+    value_type       sigma_g_max_;
+    std::vector<Box> cells_;
+    FlowProperties   flow_properties_;
+    CellList         cell_list_;
+    Stats            stats_;
 };
 
 }  // namespace mf

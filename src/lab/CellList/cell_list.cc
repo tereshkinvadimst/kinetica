@@ -1,7 +1,9 @@
 #include "lab/CellList/cell_list.hh"
 
+#include <algorithm>
+
 mf::CellList::CellList(size_type n_cells, size_type n_particles)
-    : n_cells_{n_cells}, cell_begin_(n_cells + 1), particles_ids(n_particles) {}
+    : n_cells_{n_cells}, cell_begin_(n_cells + 1), work_(n_cells + 1), particles_ids(n_particles) {}
 
 void mf::CellList::build(const std::vector<size_type>& particle_cell_id) {
     cell_begin_.assign(cell_begin_.size(), size_type{});
@@ -12,11 +14,11 @@ void mf::CellList::build(const std::vector<size_type>& particle_cell_id) {
 
     for (size_type i = 1; i <= n_cells_; ++i) cell_begin_[i] += cell_begin_[i - 1];
 
-    auto work = cell_begin_;
+    std::copy(cell_begin_.begin(), cell_begin_.begin() + n_cells_, work_.begin());
 
     for (size_type p{}; p < particle_cell_id.size(); ++p) {
-        auto c                   = particle_cell_id[p];
-        particles_ids[work[c]++] = p;
+        auto c                    = particle_cell_id[p];
+        particles_ids[work_[c]++] = p;
     }
 }
 

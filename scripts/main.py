@@ -14,7 +14,7 @@ LCZ           = 1e-5     # Характерный размер ячейки по
 NCX           = int(LX / LCX)                       # Число ячеек по x
 NCY           = int(LY / LCY)                       # Число ячеек по y
 NCZ           = int(LZ / LCZ)                       # Число ячеек по z
-DT            = 1e-8     # Временной шаг моделирования [с]
+DT            = 1e-13    # Временной шаг моделирования [с]
 TOTAL_TIME    = 1e-6     # Полное время моделирования [с]
 
 def main():
@@ -32,9 +32,12 @@ def main():
         domain.updateCellList()
         domain.collideParticles(DT)
         domain.moveParticles(DT)
-        domain.saveXYZ(f"kinetica_{counter}.xyz")
-        print(f"time = {time}, counter = {counter}")
+        if(counter % 5000 == 0):
+            domain.printStatsHeader()
+        if(counter % 500 == 0):
+            domain.printStats(time)
         counter += 1
+        time += DT
         
     
 if __name__ == "__main__":

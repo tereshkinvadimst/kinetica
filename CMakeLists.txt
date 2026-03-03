@@ -11,7 +11,7 @@ message(STATUS "VCPKG_HOST_TRIPLET   = ${VCPKG_HOST_TRIPLET}")
 
 project(
     _kinetica
-    VERSION 0.0.1
+    VERSION 0.0.2
     LANGUAGES CXX
 )
 
@@ -71,6 +71,10 @@ nanobind_add_module(
     src/lab/Box/box.hh
     src/lab/Boundaries/boundaries.hh
     src/lab/Boundaries/boundaries.cc
+    src/lab/Properties/flow_properties.hh
+    src/lab/Properties/flow_properties.cc
+    src/lab/Properties/stats.hh
+    src/lab/Properties/stats.cc
     src/lab/Domain/domain.hh
     src/lab/Domain/domain.cc
     src/lab/core.cc
@@ -94,10 +98,14 @@ install(TARGETS _kinetica LIBRARY DESTINATION kinetica)
 
 nanobind_add_stub(
     kinetica_stub
-    MODULE _kinetica
-    OUTPUT ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:_kinetica>
-    DEPENDS _kinetica
+    MODULE
+    _kinetica
+    OUTPUT
+    ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi
+    PYTHON_PATH
+    $<TARGET_FILE_DIR:_kinetica>
+    DEPENDS
+    _kinetica
 )
 
 find_package(Eigen3 CONFIG REQUIRED NO_MODULE)

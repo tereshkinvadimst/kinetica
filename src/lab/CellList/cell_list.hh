@@ -21,6 +21,7 @@ class CellList final {
    private:
     size_type              n_cells_;
     std::vector<size_type> cell_begin_;
+    std::vector<size_type> work_;
     std::vector<size_type> particles_ids;
 };
 

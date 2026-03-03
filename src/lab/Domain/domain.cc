@@ -46,13 +46,17 @@ mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecu
     , hx_{}
     , hy_{}
     , hz_{}
-    , avg_sigma_g_max_{}
-    , cells_{}
     , sigma_g_max_{}
-    , cell_list_{} {
+    , cells_{}
+    , flow_properties_{}
+    , cell_list_{}
+    , stats_{} {
     particles_.m             = m;
     particles_.W             = W;
     particles_.molecule_size = molecule_size;
+    stats_.initStat("t_coll [ms]");
+    stats_.initStat("t_clist [ms]");
+    stats_.initStat("t_mp [ms]");
 }
 
 void mf::Domain::generateParticles(value_type n_density, value_type T) {
@@ -69,7 +73,7 @@ void mf::Domain::generateParticles(value_type n_density, value_type T) {
     generateMaxwellVelocities(particles_.uz, velocity_scale_factor, gen_);
 
     const auto max_velocity = std::max_element(particles_.ux.begin(), particles_.ux.end());
-    avg_sigma_g_max_        = particles_.sigma(2. * (*max_velocity)) * (*max_velocity);
+    sigma_g_max_            = particles_.sigma(2. * (*max_velocity)) * (*max_velocity);
 }
 
 void mf::Domain::generateMesh(value_type hx, value_type hy, value_type hz) {
@@ -84,7 +88,7 @@ void mf::Domain::generateMesh(value_type hx, value_type hy, value_type hz) {
     n_cells_z_ = static_cast<size_type>(std::ceil(domain_box_.Lz / hz));
     cells_     = std::vector<Box>(n_cells_x_ * n_cells_y_ * n_cells_z_);
     std::cout << "n cells = " << cells_.size() << '\n';
-    sigma_g_max_ = std::vector<value_type>(cells_.size(), avg_sigma_g_max_);
+    flow_properties_ = FlowProperties(cells_.size());
     // Заполняем ячейки
     for (size_type k = 0; k < n_cells_z_; ++k) {
         for (size_type j = 0; j < n_cells_y_; ++j) {
@@ -126,7 +130,7 @@ void mf::Domain::updateCellList() {
     cell_list_.build(particles_.cell_id);
 
     const auto stop = std::chrono::high_resolution_clock::now();
-    std::cout << "Update cell list " << duration_cast<std::chrono::milliseconds>(stop - start) << " ms\n";
+    stats_.addStat("t_clist [ms]", std::chrono::duration<value_type, std::milli>(stop - start).count());
 }
 
 auto mf::Domain::cellIndex(double x, double y, double z) -> size_type const {
@@ -156,12 +160,11 @@ void mf::Domain::moveParticles(value_type dt) {
         particles_.z[p] += particles_.uz[p] * dt;
     }
     const auto stop = std::chrono::high_resolution_clock::now();
-    std::cout << "Moves particles " << duration_cast<std::chrono::milliseconds>(stop - start) << " ms\n";
+    stats_.addStat("t_mp [ms]", std::chrono::duration<value_type, std::milli>(stop - start).count());
 }
 
 void mf::Domain::collideParticles(value_type dt) {
-    const auto start = std::chrono::high_resolution_clock::now();
-    std::cout << "Start computing collisions...\n";
+    const auto                                 start = std::chrono::high_resolution_clock::now();
 
     std::uniform_real_distribution<value_type> u01(0., 1.);
     std::normal_distribution<double>           normal(0., 1.);
@@ -169,7 +172,7 @@ void mf::Domain::collideParticles(value_type dt) {
         auto       particles_in_cell = cell_list_.getParticlesInCell(c);
         const auto Np                = particles_in_cell.size();
         if (Np < 2) continue;  // пропускаем ячейки с <2 частицами
-        const auto collision_rate = sigma_g_max_[c] / cells_[c].volume();
+        const auto collision_rate = sigma_g_max_ / cells_[c].volume();
         // Вычисляем число сталкивающихся частиц
         const auto                               N_avg      = Np;
         const auto                               N_coll_avg = 0.5 * Np * N_avg * particles_.W * collision_rate * dt;
@@ -191,8 +194,8 @@ void mf::Domain::collideParticles(value_type dt) {
             const auto gij      = std::sqrt(gij_2);
             const auto half_gij = 0.5 * gij;
             const auto sigma_g  = particles_.sigma(gij) * gij;
-            if (sigma_g > sigma_g_max_[c]) sigma_g_max_[c] = sigma_g;
-            if (u01(gen_) < sigma_g / sigma_g_max_[c]) {  // Принимаем столкновения с вероятностью
+            if (sigma_g > sigma_g_max_) sigma_g_max_ = sigma_g;
+            if (u01(gen_) < sigma_g / sigma_g_max_) {  // Принимаем столкновения с вероятностью
                 /// Считаем скорость центра масс
                 const auto ucm_x = 0.5 * (particles_.ux[i] + particles_.ux[j]);
                 const auto ucm_y = 0.5 * (particles_.uy[i] + particles_.uy[j]);
@@ -218,7 +221,7 @@ void mf::Domain::collideParticles(value_type dt) {
     }
 
     const auto stop = std::chrono::high_resolution_clock::now();
-    std::cout << "Collide particles " << duration_cast<std::chrono::milliseconds>(stop - start) << " ms\n";
+    stats_.addStat("t_coll [ms]", std::chrono::duration<value_type, std::milli>(stop - start).count());
 }
 
 void mf::Domain::saveXYZ(std::string file_name) const {
@@ -244,3 +247,45 @@ void mf::Domain::saveXYZ(std::string file_name) const {
 
     fout.close();
 }
+
+void mf::Domain::computeFlowProperties() {
+    const value_type mass_over_kB = particles_.m / K_B;
+
+    for (size_type c{}; c < cells_.size(); ++c) {
+        auto       particles_ids = cell_list_.getParticlesInCell(c);
+        value_type ux{};
+        value_type uy{};
+        value_type uz{};
+        value_type u2x{};
+        value_type u2y{};
+        value_type u2z{};
+
+        for (auto i : particles_ids) {
+            ux += particles_.ux[i];
+            uy += particles_.uy[i];
+            uz += particles_.uz[i];
+            u2x += particles_.ux[i] * particles_.ux[i];
+            u2y += particles_.uy[i] * particles_.uy[i];
+            u2z += particles_.uz[i] * particles_.uz[i];
+        }
+        flow_properties_.n_density[c] = particles_ids.size() / cells_[c].volume();
+        const value_type inv_N        = 1. / particles_ids.size();
+        flow_properties_.ux[c]        = ux * inv_N;
+        flow_properties_.uy[c]        = uy * inv_N;
+        flow_properties_.uz[c]        = uz * inv_N;
+
+        flow_properties_.u2x[c]       = u2x * inv_N;
+        flow_properties_.u2y[c]       = u2y * inv_N;
+        flow_properties_.u2z[c]       = u2z * inv_N;
+
+        flow_properties_.Ttrx[c]      = mass_over_kB * flow_properties_.u2x[c];
+        flow_properties_.Ttry[c]      = mass_over_kB * flow_properties_.u2y[c];
+        flow_properties_.Ttrz[c]      = mass_over_kB * flow_properties_.u2z[c];
+
+        flow_properties_.Ttr[c]       = (flow_properties_.Ttrx[c] + flow_properties_.Ttry[c] + flow_properties_.Ttrz[c]) / 3.;
+    }
+}
+
+void mf::Domain::printStatsHeader() { stats_.printHeader(); }
+
+void mf::Domain::printStats(value_type time) { stats_.printStats(time); }

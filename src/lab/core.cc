@@ -52,6 +52,10 @@ NB_MODULE(_kinetica, m) {
         .def("moveParticles", &mf::Domain::moveParticles, "dt"_a)
         .def("collideParticles", &mf::Domain::collideParticles, "dt"_a)
         .def("saveXYZ", &mf::Domain::saveXYZ, "file_name"_a)
+        .def("computeFlowProperties", &mf::Domain::computeFlowProperties)
         .def("printStatsHeader", &mf::Domain::printStatsHeader)
-        .def("printStats", &mf::Domain::printStats, "time"_a);
+        .def("printStats", &mf::Domain::printStats, "time"_a)
+        .def("setDiffuseWall", &mf::Domain::setDiffuseWall, "domain_box"_a, "Tw"_a)
+        .def("applyBoundaries", &mf::Domain::applyBoundaries, "dt"_a)
+        .def("writeVTU", &mf::Domain::writeVTU, "file_name"_a);
 }

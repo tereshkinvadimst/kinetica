@@ -62,6 +62,7 @@ nanobind_add_module(
     STABLE_ABI
     # Source code goes here
     src/lab/config.hh
+    src/lab/Random/generators.hh
     src/lab/Random/xoshiro256.hh
     src/lab/Random/xoshiro256.cc
     src/lab/CellList/cell_list.hh

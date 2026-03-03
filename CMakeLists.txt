@@ -2,7 +2,6 @@
 cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 # Настройки проекта
-set(target_name kinetics-lab)
 set(PYTHON_VERSION 3.13)
 
 message(STATUS "CMAKE_CXX_COMPILER   = ${CMAKE_CXX_COMPILER}")
@@ -11,7 +10,7 @@ message(STATUS "VCPKG_TARGET_TRIPLET = ${VCPKG_TARGET_TRIPLET}")
 message(STATUS "VCPKG_HOST_TRIPLET   = ${VCPKG_HOST_TRIPLET}")
 
 project(
-    ${target_name}
+    _kinetica
     VERSION 0.0.1
     LANGUAGES CXX
 )
@@ -30,10 +29,6 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
     )
 endif()
 
-set(lib_sources src/lab/config.hh src/lab/Random/xoshiro256.hh
-                src/lab/Random/xoshiro256.cc src/lab/core.cc
-)
-
 find_package(
     Python ${PYTHON_VERSION} REQUIRED
     COMPONENTS Interpreter Development.Module
@@ -46,53 +41,65 @@ execute_process(
     OUTPUT_VARIABLE nanobind_ROOT
 )
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE
+        Release
+        CACHE STRING "Choose the type of build." FORCE
+    )
+    set_property(
+        CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel"
+                                        "RelWithDebInfo"
+    )
+endif()
+
 find_package(nanobind CONFIG REQUIRED)
 
 nanobind_add_module(
     # Name of the extension
-    ${target_name}
+    _kinetica
     # Target the stable ABI for Python 3.12+, which reduces the number of binary
     # wheels that must be built. This does nothing on older Python versions
     STABLE_ABI
     # Source code goes here
-    ${lib_sources}
-)
-
-install(TARGETS ${target_name} LIBRARY DESTINATION kinetica)
-
-nanobind_add_stub(
-    mdca_stub
-    MODULE
-    ${target_name}
-    OUTPUT
-    ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi
-    PYTHON_PATH
-    $<TARGET_FILE_DIR:${target_name}>
-    DEPENDS
-    ${target_name}
-)
-
-# Генерируем файл с макросами для экспорта функций
-include(GenerateExportHeader)
-generate_export_header(
-    ${target_name} EXPORT_FILE_NAME
-    ${CMAKE_CURRENT_BINARY_DIR}/generated/lib_export.hh
+    src/lab/config.hh
+    src/lab/Random/xoshiro256.hh
+    src/lab/Random/xoshiro256.cc
+    src/lab/CellList/cell_list.hh
+    src/lab/CellList/cell_list.cc
+    src/lab/Particles/particles.hh
+    src/lab/Particles/particles.cc
+    src/lab/Box/box.hh
+    src/lab/Boundaries/boundaries.hh
+    src/lab/Boundaries/boundaries.cc
+    src/lab/Domain/domain.hh
+    src/lab/Domain/domain.cc
+    src/lab/core.cc
 )
 
 set_target_properties(
-    ${target_name}
+    _kinetica
     PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED on
                CXX_EXTENSIONS off
 )
 
 target_include_directories(
-    ${target_name}
+    _kinetica
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
            $<INSTALL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
            ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
+install(TARGETS _kinetica LIBRARY DESTINATION kinetica)
+
+nanobind_add_stub(
+    kinetica_stub
+    MODULE _kinetica
+    OUTPUT ${CMAKE_SOURCE_DIR}/src/kinetica/__init__.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:_kinetica>
+    DEPENDS _kinetica
+)
+
 find_package(Eigen3 CONFIG REQUIRED NO_MODULE)
 
-target_link_libraries(${target_name} PUBLIC Eigen3::Eigen)
+target_link_libraries(_kinetica PUBLIC Eigen3::Eigen)

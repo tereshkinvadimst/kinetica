@@ -31,7 +31,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "Kokkos_ENABLE_OPENMP": "On",
-                "CMAKE_CXX_FLAGS": ""
+                "CMAKE_CXX_FLAGS": "-march=native"
             }
         }
     ]

@@ -1,4 +1,4 @@
-#include "lab/Particles/particles.hh"
+#include "kinetica/Particles/particles.hh"
 
 #include <numbers>
 

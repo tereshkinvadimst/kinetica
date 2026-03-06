@@ -1,5 +1,5 @@
 
-#include "lab/Properties/stats.hh"
+#include "kinetica/Properties/stats.hh"
 
 #include <iomanip>
 #include <iostream>

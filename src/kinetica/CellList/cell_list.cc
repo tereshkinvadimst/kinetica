@@ -1,4 +1,4 @@
-#include "lab/CellList/cell_list.hh"
+#include "kinetica/CellList/cell_list.hh"
 
 #include <algorithm>
 

@@ -1,4 +1,4 @@
-#include "lab/Random/xoshiro256.hh"
+#include "kinetica/Random/xoshiro256.hh"
 
 mf::xoshiro256::xoshiro256(result_type seed) { stateFromSeed(seed); }
 

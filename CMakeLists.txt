@@ -61,24 +61,25 @@ nanobind_add_module(
     # wheels that must be built. This does nothing on older Python versions
     STABLE_ABI
     # Source code goes here
-    src/lab/config.hh
-    src/lab/Random/generators.hh
-    src/lab/Random/xoshiro256.hh
-    src/lab/Random/xoshiro256.cc
-    src/lab/CellList/cell_list.hh
-    src/lab/CellList/cell_list.cc
-    src/lab/Particles/particles.hh
-    src/lab/Particles/particles.cc
-    src/lab/Box/box.hh
-    src/lab/Boundaries/boundaries.hh
-    src/lab/Boundaries/boundaries.cc
-    src/lab/Properties/flow_properties.hh
-    src/lab/Properties/flow_properties.cc
-    src/lab/Properties/stats.hh
-    src/lab/Properties/stats.cc
-    src/lab/Domain/domain.hh
-    src/lab/Domain/domain.cc
-    src/lab/core.cc
+    src/kinetica/config.hh
+    src/kinetica/Random/generators.hh
+    src/kinetica/Random/xoshiro256.hh
+    src/kinetica/Random/xoshiro256.cc
+    src/kinetica/Random/random.hh
+    src/kinetica/CellList/cell_list.hh
+    src/kinetica/CellList/cell_list.cc
+    src/kinetica/Particles/particles.hh
+    src/kinetica/Particles/particles.cc
+    src/kinetica/Box/box.hh
+    src/kinetica/Boundaries/boundaries.hh
+    src/kinetica/Boundaries/boundaries.cc
+    src/kinetica/Properties/flow_properties.hh
+    src/kinetica/Properties/flow_properties.cc
+    src/kinetica/Properties/stats.hh
+    src/kinetica/Properties/stats.cc
+    src/kinetica/Domain/domain.hh
+    src/kinetica/Domain/domain.cc
+    src/kinetica/core.cc
 )
 
 set_target_properties(

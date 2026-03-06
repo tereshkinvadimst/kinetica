@@ -1,6 +1,5 @@
 #ifndef MF_KINETICA_BOUNDARIES_H
 #define MF_KINETICA_BOUNDARIES_H
-#include "lab/constants.hh"
 #pragma once
 
 #include <cassert>
@@ -8,9 +7,9 @@
 #include <concepts>
 #include <ranges>
 
-#include "lab/Box/box.hh"
-#include "lab/Particles/particles.hh"
-#include "lab/Random/xoshiro256.hh"
+#include "kinetica/Box/box.hh"
+#include "kinetica/Particles/particles.hh"
+#include "kinetica/Random/random.hh"
 
 namespace mf {
 
@@ -37,25 +36,7 @@ void applyPeriodic(R&& xs, std::ranges::range_value_t<R> left, std::ranges::rang
 
 void applyPeriodic(Particles& particles, Box box, bool px, bool py, bool pz) noexcept;
 
-class DiffuseWallBoundary final {
-   public:
-    using value_type      = double;
-    using size_type       = std::size_t;
-
-    DiffuseWallBoundary() = default;
-
-    explicit DiffuseWallBoundary(Box wall_position, value_type Tw);
-
-    auto scatter(char axis, int sign, double m, xoshiro256& rng) const -> std::tuple<value_type, value_type, value_type>;
-
-    void killParticlesInBox(Particles& particles) const;
-
-    void operator()(Particles& particles, value_type dt, xoshiro256& rng) const;
-
-   private:
-    Box        wall_position_;
-    value_type Tw_;
-};
+auto scatterDiffuse(char axis, int sign, double Tw, double m, random& rng) -> std::tuple<double, double, double>;
 
 }  // namespace mf
 

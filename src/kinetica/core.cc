@@ -4,8 +4,8 @@
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/string.h>
 
-#include "lab/Box/box.hh"
-#include "lab/Domain/domain.hh"
+#include "kinetica/Box/box.hh"
+#include "kinetica/Domain/domain.hh"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -55,7 +55,6 @@ NB_MODULE(_kinetica, m) {
         .def("computeFlowProperties", &mf::Domain::computeFlowProperties)
         .def("printStatsHeader", &mf::Domain::printStatsHeader)
         .def("printStats", &mf::Domain::printStats, "time"_a)
-        .def("setDiffuseWall", &mf::Domain::setDiffuseWall, "domain_box"_a, "Tw"_a)
-        .def("applyBoundaries", &mf::Domain::applyBoundaries, "dt"_a)
+        .def("setDiffuseWall", &mf::Domain::setDiffuseWall, "side"_a, "Tw"_a)
         .def("writeVTU", &mf::Domain::writeVTU, "file_name"_a);
 }

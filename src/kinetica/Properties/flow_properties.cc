@@ -1,4 +1,4 @@
-#include "lab/Properties/flow_properties.hh"
+#include "kinetica/Properties/flow_properties.hh"
 
 mf::FlowProperties::FlowProperties(size_type N_cells)
     : n_density(N_cells)

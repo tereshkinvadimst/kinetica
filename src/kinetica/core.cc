@@ -41,20 +41,27 @@ NB_MODULE(_kinetica, m) {
 
     // --- Domain ---
     nb::class_<mf::Domain>(m, "Domain")
-        .def(nb::init<mf::Box, double, double, double>(), "domain_box"_a, "mass"_a, "W"_a, "molecule_size"_a)
+        .def(nb::init<mf::Box, double, double, double, double>(),
+             "domain_box"_a,
+             "mass"_a,
+             "W"_a,
+             "molecule_size"_a,
+             "scale_factor"_a)
 
         // Методы для генерации частиц и сетки
         .def("generateParticles", &mf::Domain::generateParticles, "n_density"_a, "T"_a)
-        .def("generateMesh", &mf::Domain::generateMesh, "hx"_a, "hy"_a, "hz"_a)
+        .def("generateMesh", &mf::Domain::generateMesh)
         .def("makeCellList", &mf::Domain::makeCellList)
         .def("updateCellList", &mf::Domain::updateCellList)
         .def("applyPeriodicBoundaries", &mf::Domain::applyPeriodicBoundaries, "px"_a, "py"_a, "pz"_a)
-        .def("moveParticles", &mf::Domain::moveParticles, "dt"_a)
-        .def("collideParticles", &mf::Domain::collideParticles, "dt"_a)
+        .def("moveParticles", &mf::Domain::moveParticles)
+        .def("collideParticles", &mf::Domain::collideParticles)
         .def("saveXYZ", &mf::Domain::saveXYZ, "file_name"_a)
         .def("computeFlowProperties", &mf::Domain::computeFlowProperties)
         .def("printStatsHeader", &mf::Domain::printStatsHeader)
         .def("printStats", &mf::Domain::printStats, "time"_a)
         .def("setDiffuseWall", &mf::Domain::setDiffuseWall, "side"_a, "Tw"_a)
-        .def("writeVTU", &mf::Domain::writeVTU, "file_name"_a);
+        .def("writeVTU", &mf::Domain::writeVTU, "file_name"_a)
+        .def("getTimeStep", &mf::Domain::getTimeStep);
+
 }

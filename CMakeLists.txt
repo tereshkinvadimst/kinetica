@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 # Настройки проекта
-set(PYTHON_VERSION 3.13)
+set(PYTHON_VERSION 3.14.3)
 
 message(STATUS "CMAKE_CXX_COMPILER   = ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_TOOLCHAIN_FILE = ${CMAKE_TOOLCHAIN_FILE}")
@@ -11,7 +11,7 @@ message(STATUS "VCPKG_HOST_TRIPLET   = ${VCPKG_HOST_TRIPLET}")
 
 project(
     _kinetica
-    VERSION 0.0.2
+    VERSION 0.1.0
     LANGUAGES CXX
 )
 
@@ -77,6 +77,8 @@ nanobind_add_module(
     src/kinetica/Properties/flow_properties.cc
     src/kinetica/Properties/stats.hh
     src/kinetica/Properties/stats.cc
+    src/kinetica/DSMC/mover.hh
+    src/kinetica/DSMC/utils.hh
     src/kinetica/Domain/domain.hh
     src/kinetica/Domain/domain.cc
     src/kinetica/core.cc

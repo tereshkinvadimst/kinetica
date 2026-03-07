@@ -11,7 +11,6 @@
 #include "kinetica/Properties/stats.hh"
 #include "kinetica/Random/random.hh"
 
-
 namespace mf {
 
 class Domain {
@@ -19,21 +18,22 @@ class Domain {
     using size_type  = std::size_t;
     using value_type = double;
 
-    explicit Domain(Box domain_box, value_type m, value_type W, value_type molecule_size);
+    explicit Domain(Box domain_box, value_type m, value_type W, value_type molecule_size, value_type scale_factor);
 
     void generateParticles(value_type n_density, value_type T);
-    void generateMesh(value_type hx, value_type hy, value_type hz);
+    void generateMesh();
     void makeCellList();
     void updateCellList();
     void applyPeriodicBoundaries(bool px, bool py, bool pz);
-    void moveParticles(value_type dt);
-    void collideParticles(value_type dt);
+    void moveParticles();
+    void collideParticles();
     void saveXYZ(std::string file_name) const;
     void computeFlowProperties();
     void printStatsHeader();
     void printStats(value_type time);
     void setDiffuseWall(size_type side, value_type Tw);
     void writeVTU(std::string file_name) const;
+    auto getTimeStep() const noexcept -> value_type;
 
    private:
     auto cellIndex(double x, double y, double z) -> size_type const;
@@ -45,9 +45,6 @@ class Domain {
     size_type                 n_cells_x_;
     size_type                 n_cells_y_;
     size_type                 n_cells_z_;
-    value_type                hx_;
-    value_type                hy_;
-    value_type                hz_;
     value_type                sigma_g_max_;
     std::vector<Box>          cells_;
     FlowProperties            flow_properties_;
@@ -55,6 +52,11 @@ class Domain {
     Stats                     stats_;
     std::array<bool, 6>       is_diffuse_walls_;
     std::array<value_type, 6> diffuse_wall_temperature_;
+    value_type                lambda_;
+    value_type                time_step_;
+    value_type                cell_size_;
+    value_type                scale_factor_;
+    value_type                max_velocity_;
 };
 
 }  // namespace mf

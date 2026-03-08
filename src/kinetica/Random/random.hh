@@ -8,7 +8,7 @@
 
 namespace mf {
 
-using random = xoshiro256;
+using random = std::mt19937;
 
 }
 

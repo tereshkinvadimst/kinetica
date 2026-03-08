@@ -15,7 +15,7 @@ inline void generateUniformPositions(R&&                           out,
                                      RAND&                         gen) noexcept {
     using T = std::ranges::range_value_t<R>;
 #ifndef NDEBUG
-    assert(left < right);
+    assert(left <= right);
 #endif
 
     std::uniform_real_distribution<T> dist(left, right);

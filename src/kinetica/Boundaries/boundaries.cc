@@ -6,13 +6,13 @@
 
 void mf::applyPeriodic(Particles& particles, Box box, bool px, bool py, bool pz) noexcept {
     if (px) {
-        applyPeriodic(particles.x, box.x0, box.Lx);
+        applyPeriodic(particles.x, box.x0, box.x0 + box.Lx);
     }
     if (py) {
-        applyPeriodic(particles.y, box.y0, box.Ly);
+        applyPeriodic(particles.y, box.y0, box.y0 + box.Ly);
     }
     if (pz) {
-        applyPeriodic(particles.z, box.z0, box.Lz);
+        applyPeriodic(particles.z, box.z0, box.z0 + box.Lz);
     }
 }
 

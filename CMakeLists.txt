@@ -11,7 +11,7 @@ message(STATUS "VCPKG_HOST_TRIPLET   = ${VCPKG_HOST_TRIPLET}")
 
 project(
     _kinetica
-    VERSION 0.1.0
+    VERSION 0.1.1
     LANGUAGES CXX
 )
 
@@ -79,6 +79,8 @@ nanobind_add_module(
     src/kinetica/Properties/stats.cc
     src/kinetica/DSMC/mover.hh
     src/kinetica/DSMC/utils.hh
+    src/kinetica/Properties/profiles.hh
+    src/kinetica/Properties/profiles.cc
     src/kinetica/Domain/domain.hh
     src/kinetica/Domain/domain.cc
     src/kinetica/core.cc

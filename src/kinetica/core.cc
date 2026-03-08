@@ -62,6 +62,6 @@ NB_MODULE(_kinetica, m) {
         .def("printStats", &mf::Domain::printStats, "time"_a)
         .def("setDiffuseWall", &mf::Domain::setDiffuseWall, "side"_a, "Tw"_a)
         .def("writeVTU", &mf::Domain::writeVTU, "file_name"_a)
-        .def("getTimeStep", &mf::Domain::getTimeStep);
-
+        .def("getTimeStep", &mf::Domain::getTimeStep)
+        .def("writeXProfile", &mf::Domain::writeXProfile, "file_name"_a);
 }

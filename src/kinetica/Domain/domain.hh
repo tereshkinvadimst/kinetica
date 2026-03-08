@@ -8,6 +8,7 @@
 #include "kinetica/CellList/cell_list.hh"
 #include "kinetica/Particles/particles.hh"
 #include "kinetica/Properties/flow_properties.hh"
+#include "kinetica/Properties/profiles.hh"
 #include "kinetica/Properties/stats.hh"
 #include "kinetica/Random/random.hh"
 
@@ -34,6 +35,7 @@ class Domain {
     void setDiffuseWall(size_type side, value_type Tw);
     void writeVTU(std::string file_name) const;
     auto getTimeStep() const noexcept -> value_type;
+    void writeXProfile(std::string file_name);
 
    private:
     auto cellIndex(double x, double y, double z) -> size_type const;
@@ -57,6 +59,7 @@ class Domain {
     value_type                cell_size_;
     value_type                scale_factor_;
     value_type                max_velocity_;
+    XProfiler                 xprofiler_;
 };
 
 }  // namespace mf

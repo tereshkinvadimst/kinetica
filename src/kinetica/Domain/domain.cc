@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -34,7 +35,8 @@ mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecu
     , time_step_{}
     , cell_size_{}
     , scale_factor_{scale_factor}
-    , max_velocity_{} {
+    , max_velocity_{}
+    , xprofiler_(&domain_box, &flow_properties_) {
     particles_.m             = m;
     particles_.W             = W;
     particles_.molecule_size = molecule_size;
@@ -63,9 +65,10 @@ void mf::Domain::generateParticles(value_type n_density, value_type T) {
     const auto max_velocity_x = std::max_element(particles_.ux.begin(), particles_.ux.end());
     const auto max_velocity_y = std::max_element(particles_.uy.begin(), particles_.uy.end());
     const auto max_velocity_z = std::max_element(particles_.uz.begin(), particles_.uz.end());
-    max_velocity_ = std::sqrt((*max_velocity_x) * (*max_velocity_x) + (*max_velocity_y) * (*max_velocity_z) + (*max_velocity_z));
-    time_step_    = computeTimeStep(lambda_, max_velocity_, scale_factor_);
-    sigma_g_max_  = particles_.sigma(2. * max_velocity_) * max_velocity_;
+    max_velocity_             = std::sqrt((*max_velocity_x) * (*max_velocity_x) + (*max_velocity_y) * (*max_velocity_y) +
+                              (*max_velocity_z) * (*max_velocity_z));
+    time_step_                = computeTimeStep(lambda_, max_velocity_, scale_factor_);
+    sigma_g_max_              = particles_.sigma(2. * max_velocity_) * max_velocity_;
 }
 
 void mf::Domain::generateMesh() {
@@ -88,9 +91,9 @@ void mf::Domain::generateMesh() {
                 cells_[id].x0       = x;
                 cells_[id].y0       = y;
                 cells_[id].z0       = z;
-                cells_[id].Lx       = x + cell_size_;
-                cells_[id].Ly       = y + cell_size_;
-                cells_[id].Lz       = z + cell_size_;
+                cells_[id].Lx       = cell_size_;
+                cells_[id].Ly       = cell_size_;
+                cells_[id].Lz       = cell_size_;
             }
         }
     }
@@ -117,12 +120,15 @@ void mf::Domain::updateCellList() {
 }
 
 auto mf::Domain::cellIndex(double x, double y, double z) -> size_type const {
-    size_type i = std::min(static_cast<size_type>(std::floor((x - domain_box_.x0) / cell_size_)), n_cells_x_ - 1);
-    size_type j = std::min(static_cast<size_type>(std::floor((y - domain_box_.y0) / cell_size_)), n_cells_y_ - 1);
-    size_type k = std::min(static_cast<size_type>(std::floor((z - domain_box_.z0) / cell_size_)), n_cells_z_ - 1);
-    i           = std::max<size_type>(0, i);
-    j           = std::max<size_type>(0, j);
-    k           = std::max<size_type>(0, k);
+    size_type i =
+        std::min(static_cast<size_type>(std::floor((x - domain_box_.x0) / cell_size_)), static_cast<size_type>(n_cells_x_ - 1));
+    size_type j =
+        std::min(static_cast<size_type>(std::floor((y - domain_box_.y0) / cell_size_)), static_cast<size_type>(n_cells_y_ - 1));
+    size_type k =
+        std::min(static_cast<size_type>(std::floor((z - domain_box_.z0) / cell_size_)), static_cast<size_type>(n_cells_z_ - 1));
+    i = std::max<size_type>(0, i);
+    j = std::max<size_type>(0, j);
+    k = std::max<size_type>(0, k);
     return i + n_cells_x_ * (j + n_cells_y_ * k);
 }
 
@@ -269,9 +275,11 @@ void mf::Domain::collideParticles() {
 
     std::uniform_real_distribution<value_type> u01(0., 1.);
     std::normal_distribution<double>           normal(0., 1.);
+    value_type                                 Navg = {};
     for (size_type c{}; c < cells_.size(); ++c) {
         auto       particles_in_cell = cell_list_.getParticlesInCell(c);
         const auto Np                = particles_in_cell.size();
+        Navg += Np;
         if (Np < 2) continue;  // пропускаем ячейки с <2 частицами
         const auto collision_rate = sigma_g_max_ / cells_[c].volume();
         // Вычисляем число сталкивающихся частиц
@@ -322,7 +330,7 @@ void mf::Domain::collideParticles() {
     }
     const auto stop = std::chrono::high_resolution_clock::now();
     stats_.addStat("t_coll [ms]", std::chrono::duration<value_type, std::milli>(stop - start).count());
-    stats_.addStat("Navg", particles_.getNParticles() / (n_cells_x_ * n_cells_y_ * n_cells_z_));
+    stats_.addStat("Navg", Navg / (n_cells_x_ * n_cells_y_ * n_cells_z_));
 }
 
 void mf::Domain::saveXYZ(std::string file_name) const {
@@ -565,3 +573,5 @@ void mf::Domain::writeVTU(std::string file_name) const {
 }
 
 auto mf::Domain::getTimeStep() const noexcept -> value_type { return time_step_; }
+
+void mf::Domain::writeXProfile(std::string file_name) { xprofiler_(file_name, n_cells_x_, n_cells_y_, n_cells_z_, cell_size_); }

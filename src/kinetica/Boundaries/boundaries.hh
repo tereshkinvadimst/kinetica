@@ -18,12 +18,14 @@ constexpr auto applyPeriodic(T x, T left, T right) noexcept -> T {
 #ifndef NDEBUG
     assert(left < right);
 #endif
-
     const auto L = right - left;
 
-    T          r = std::fmod(x - left, L);
-    if (r < T{}) r += L;
-    return left + r;
+    if (x < left) {
+        return x + L;
+    } else if (x >= right) {
+        return x - L;
+    }
+    return x;
 }
 
 template <std::ranges::range R>

@@ -50,7 +50,11 @@ mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecu
 void mf::Domain::generateParticles(value_type n_density, value_type T) {
     const auto velocity_scale_factor = computeVelocityScaleFactor(T, particles_.m);
     const auto Np                    = computeNParticles(n_density, domain_box_.volume(), particles_.W, gen_);
-    std::cout << "Np = " << Np << '\n';
+    std::cout << "Np       = " << Np << '\n';
+    std::cout << "Tini     = " << T << '\n';
+    std::cout << "Ndensity = " << n_density << '\n';
+    std::cout << "Vscale   = " << velocity_scale_factor << '\n';
+
     particles_ = Particles(Np, particles_.m, particles_.W, particles_.molecule_size);
     lambda_    = meanFreePath(n_density, particles_.molecule_size);
     // Генерация положений

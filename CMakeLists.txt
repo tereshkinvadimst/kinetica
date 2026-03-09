@@ -11,7 +11,7 @@ message(STATUS "VCPKG_HOST_TRIPLET   = ${VCPKG_HOST_TRIPLET}")
 
 project(
     _kinetica
-    VERSION 0.1.1
+    VERSION 0.1.2
     LANGUAGES CXX
 )
 

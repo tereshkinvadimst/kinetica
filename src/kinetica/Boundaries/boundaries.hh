@@ -40,6 +40,8 @@ void applyPeriodic(Particles& particles, Box box, bool px, bool py, bool pz) noe
 
 auto scatterDiffuse(char axis, int sign, double Tw, double m, random& rng) -> std::tuple<double, double, double>;
 
+// void inletBoundary(Particles& particles, double n_density, double ux, double uy, double uz, double Tw, int side);
+
 }  // namespace mf
 
 #endif  // MF_KINETICA_BOUNDARIES_H

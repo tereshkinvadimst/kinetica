@@ -10,6 +10,8 @@
 #include <ranges>
 
 #include "kinetica/Boundaries/boundaries.hh"
+#include "kinetica/DSMC/collider.hh"
+#include "kinetica/DSMC/mover.hh"
 #include "kinetica/DSMC/utils.hh"
 #include "kinetica/Random/random.hh"
 #include "kinetica/constants.hh"
@@ -29,14 +31,13 @@ mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecu
     , flow_properties_{}
     , cell_list_{}
     , stats_{}
-    , is_diffuse_walls_{false, false, false, false, false, false}
-    , diffuse_wall_temperature_{}
-    , lambda_{}
-    , time_step_{}
+    , lambda_{std::numeric_limits<value_type>::max()}
+    , time_step_{std::numeric_limits<value_type>::max()}
     , cell_size_{}
     , scale_factor_{scale_factor}
     , max_velocity_{}
-    , xprofiler_(&domain_box, &flow_properties_) {
+    , xprofiler_(&domain_box_, &flow_properties_)
+    , walls_{} {
     particles_.m             = m;
     particles_.W             = W;
     particles_.molecule_size = molecule_size;
@@ -47,51 +48,77 @@ mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecu
     stats_.initStat("Navg");
 }
 
-void mf::Domain::generateParticles(value_type n_density, value_type T) {
-    const auto velocity_scale_factor = computeVelocityScaleFactor(T, particles_.m);
-    const auto Np                    = computeNParticles(n_density, domain_box_.volume(), particles_.W, gen_);
-    std::cout << "Np       = " << Np << '\n';
-    std::cout << "Tini     = " << T << '\n';
-    std::cout << "Ndensity = " << n_density << '\n';
-    std::cout << "Vscale   = " << velocity_scale_factor << '\n';
+void mf::Domain::generateParticles(value_type n_density, value_type T, value_type x_min, value_type x_max) {
+    const auto       velocity_scale_factor = computeVelocityScaleFactor(T, particles_.m);
+    const value_type x0                    = std::max(x_min, domain_box_.x0);
+    const value_type x_end                 = std::min(x_max, domain_box_.x0 + domain_box_.Lx);
 
-    particles_ = Particles(Np, particles_.m, particles_.W, particles_.molecule_size);
-    lambda_    = meanFreePath(n_density, particles_.molecule_size);
+    const value_type Lx                    = x_end - x0;
+    const Box        local_box{
+               .x0 = x0,
+               .y0 = domain_box_.y0,
+               .z0 = domain_box_.z0,
+               .Lx = Lx,
+               .Ly = domain_box_.Ly,
+               .Lz = domain_box_.Lz,
+    };
+    const auto Np = computeNParticles(n_density, local_box.volume(), particles_.W, gen_);
+
+    std::cout << "Added Np = " << Np << '\n';
+
+    const size_type old_size = particles_.getNParticles();
+    particles_.addParticles(Np);
+
+    const value_type new_lambda = meanFreePath(n_density, particles_.molecule_size);
+
+    if (new_lambda < lambda_) {
+        lambda_ = new_lambda;
+    }
+
     // Генерация положений
-    generateUniformPositions(particles_.x, domain_box_.x0, domain_box_.x0 + domain_box_.Lx, gen_);
-    generateUniformPositions(particles_.y, domain_box_.y0, domain_box_.y0 + domain_box_.Ly, gen_);
-    generateUniformPositions(particles_.z, domain_box_.z0, domain_box_.z0 + domain_box_.Lz, gen_);
+    generateUniformPositions(std::span{particles_.x.data() + old_size, Np}, x0, x0 + Lx, gen_);
+    generateUniformPositions(
+        std::span{particles_.y.data() + old_size, Np}, domain_box_.y0, domain_box_.y0 + domain_box_.Ly, gen_);
+    generateUniformPositions(
+        std::span{particles_.z.data() + old_size, Np}, domain_box_.z0, domain_box_.z0 + domain_box_.Lz, gen_);
     // Генерация скоростей
-    generateMaxwellVelocity(particles_.ux, velocity_scale_factor, gen_);
-    generateMaxwellVelocity(particles_.uy, velocity_scale_factor, gen_);
-    generateMaxwellVelocity(particles_.uz, velocity_scale_factor, gen_);
+    generateMaxwellVelocity(std::span{particles_.ux.data() + old_size, Np}, velocity_scale_factor, gen_);
+    generateMaxwellVelocity(std::span{particles_.uy.data() + old_size, Np}, velocity_scale_factor, gen_);
+    generateMaxwellVelocity(std::span{particles_.uz.data() + old_size, Np}, velocity_scale_factor, gen_);
 
-    const auto max_velocity_x = std::max_element(particles_.ux.begin(), particles_.ux.end());
-    const auto max_velocity_y = std::max_element(particles_.uy.begin(), particles_.uy.end());
-    const auto max_velocity_z = std::max_element(particles_.uz.begin(), particles_.uz.end());
-    max_velocity_             = std::sqrt((*max_velocity_x) * (*max_velocity_x) + (*max_velocity_y) * (*max_velocity_y) +
+    const auto max_velocity_x        = std::max_element(particles_.ux.begin(), particles_.ux.end());
+    const auto max_velocity_y        = std::max_element(particles_.uy.begin(), particles_.uy.end());
+    const auto max_velocity_z        = std::max_element(particles_.uz.begin(), particles_.uz.end());
+    max_velocity_                    = std::sqrt((*max_velocity_x) * (*max_velocity_x) + (*max_velocity_y) * (*max_velocity_y) +
                               (*max_velocity_z) * (*max_velocity_z));
-    time_step_                = computeTimeStep(lambda_, max_velocity_, scale_factor_);
-    sigma_g_max_              = particles_.sigma(2. * max_velocity_) * max_velocity_;
+    const value_type new_time_step   = computeTimeStep(lambda_, max_velocity_, scale_factor_);
+    const value_type new_sigma_g_max = particles_.sigma(2. * max_velocity_) * max_velocity_;
+    if (new_time_step < time_step_) {
+        time_step_ = new_time_step;
+    }
+    if (new_sigma_g_max > sigma_g_max_) {
+        sigma_g_max_ = new_sigma_g_max;
+    }
 }
 
 void mf::Domain::generateMesh() {
     cell_size_ = computeCellSize(lambda_, scale_factor_);
+    std::cout << "cell size is " << cell_size_ << '\n';
     // Вычисляем число ячеек
-    n_cells_x_ = static_cast<size_type>(domain_box_.Lx / cell_size_);
-    n_cells_y_ = static_cast<size_type>(domain_box_.Ly / cell_size_);
-    n_cells_z_ = static_cast<size_type>(domain_box_.Lz / cell_size_);
-    cells_     = std::vector<Box>(n_cells_x_ * n_cells_y_ * n_cells_z_);
+    n_cells_x_ = static_cast<size_type>(std::ceil(domain_box_.Lx / cell_size_));
+    n_cells_y_ = static_cast<size_type>(std::ceil(domain_box_.Ly / cell_size_));
+    n_cells_z_ = static_cast<size_type>(std::ceil(domain_box_.Lz / cell_size_));
     std::cout << "N cells x, y, z " << n_cells_x_ << '\t' << n_cells_y_ << '\t' << n_cells_z_ << '\n';
+    cells_           = std::vector<Box>(n_cells_x_ * n_cells_y_ * n_cells_z_);
     flow_properties_ = FlowProperties(cells_.size());
     // Заполняем ячейки
     for (size_type k = 0; k < n_cells_z_; ++k) {
+        const value_type z = domain_box_.z0 + k * cell_size_;
         for (size_type j = 0; j < n_cells_y_; ++j) {
+            const value_type y = domain_box_.y0 + j * cell_size_;
             for (size_type i = 0; i < n_cells_x_; ++i) {
                 const size_type  id = i + n_cells_x_ * (j + n_cells_y_ * k);
                 const value_type x  = domain_box_.x0 + i * cell_size_;
-                const value_type y  = domain_box_.y0 + j * cell_size_;
-                const value_type z  = domain_box_.z0 + k * cell_size_;
                 cells_[id].x0       = x;
                 cells_[id].y0       = y;
                 cells_[id].z0       = z;
@@ -124,15 +151,17 @@ void mf::Domain::updateCellList() {
 }
 
 auto mf::Domain::cellIndex(double x, double y, double z) -> size_type const {
-    size_type i =
-        std::min(static_cast<size_type>(std::floor((x - domain_box_.x0) / cell_size_)), static_cast<size_type>(n_cells_x_ - 1));
-    size_type j =
-        std::min(static_cast<size_type>(std::floor((y - domain_box_.y0) / cell_size_)), static_cast<size_type>(n_cells_y_ - 1));
-    size_type k =
-        std::min(static_cast<size_type>(std::floor((z - domain_box_.z0) / cell_size_)), static_cast<size_type>(n_cells_z_ - 1));
-    i = std::max<size_type>(0, i);
-    j = std::max<size_type>(0, j);
-    k = std::max<size_type>(0, k);
+    const value_type rx = (x - domain_box_.x0) / cell_size_;
+    const value_type ry = (y - domain_box_.y0) / cell_size_;
+    const value_type rz = (z - domain_box_.z0) / cell_size_;
+
+    size_type        i  = std::clamp(static_cast<size_type>(rx), size_type{}, n_cells_x_ - 1);
+    size_type        j  = std::clamp(static_cast<size_type>(ry), size_type{}, n_cells_y_ - 1);
+    size_type        k  = std::clamp(static_cast<size_type>(rz), size_type{}, n_cells_z_ - 1);
+
+    i                   = std::max<size_type>(0, i);
+    j                   = std::max<size_type>(0, j);
+    k                   = std::max<size_type>(0, k);
     return i + n_cells_x_ * (j + n_cells_y_ * k);
 }
 
@@ -141,132 +170,12 @@ void mf::Domain::applyPeriodicBoundaries(bool px, bool py, bool pz) { applyPerio
 void mf::Domain::moveParticles() {
     const auto start = std::chrono::high_resolution_clock::now();
 
-    for (size_type p = 0; p < particles_.getNParticles(); ++p) {
-        if (!particles_.isAlive(p)) continue;
-
-        value_type x         = particles_.x[p];
-        value_type y         = particles_.y[p];
-        value_type z         = particles_.z[p];
-
-        value_type ux        = particles_.ux[p];
-        value_type uy        = particles_.uy[p];
-        value_type uz        = particles_.uz[p];
-
-        value_type new_x     = x + ux * time_step_;
-        value_type new_y     = y + uy * time_step_;
-        value_type new_z     = z + uz * time_step_;
-
-        bool       scattered = false;
-        value_type t_hit     = time_step_;
-
-        char       axis      = 0;
-        int        sign      = 0;
-        value_type Tw        = 0;
-
-        // ---------- X walls ----------
-        if (ux != 0) {
-            const value_type xw0 = domain_box_.x0;
-            const value_type xw1 = domain_box_.x0 + domain_box_.Lx;
-
-            if (new_x < xw0 && is_diffuse_walls_[0]) {
-                const value_type t = (xw0 - x) / ux;
-                if (t >= 0 && t <= time_step_) {
-                    t_hit     = t;
-                    axis      = 'x';
-                    sign      = +1;
-                    Tw        = diffuse_wall_temperature_[0];
-                    scattered = true;
-                }
-            } else if (new_x > xw1 && is_diffuse_walls_[1]) {
-                const value_type t = (xw1 - x) / ux;
-                if (t >= 0 && t <= time_step_) {
-                    t_hit     = t;
-                    axis      = 'x';
-                    sign      = -1;
-                    Tw        = diffuse_wall_temperature_[1];
-                    scattered = true;
-                }
-            }
-        }
-
-        // ---------- Y walls ----------
-        if (!scattered && uy != 0) {
-            const value_type yw0 = domain_box_.y0;
-            const value_type yw1 = domain_box_.y0 + domain_box_.Ly;
-
-            if (new_y < yw0 && is_diffuse_walls_[2]) {
-                const value_type t = (yw0 - y) / uy;
-                if (t >= 0 && t <= time_step_) {
-                    t_hit     = t;
-                    axis      = 'y';
-                    sign      = +1;
-                    Tw        = diffuse_wall_temperature_[2];
-                    scattered = true;
-                }
-            } else if (new_y > yw1 && is_diffuse_walls_[3]) {
-                const value_type t = (yw1 - y) / uy;
-                if (t >= 0 && t <= time_step_) {
-                    t_hit     = t;
-                    axis      = 'y';
-                    sign      = -1;
-                    Tw        = diffuse_wall_temperature_[3];
-                    scattered = true;
-                }
-            }
-        }
-
-        // ---------- Z walls ----------
-        if (!scattered && uz != 0) {
-            const value_type zw0 = domain_box_.z0;
-            const value_type zw1 = domain_box_.z0 + domain_box_.Lz;
-
-            if (new_z < zw0 && is_diffuse_walls_[4]) {
-                const value_type t = (zw0 - z) / uz;
-                if (t >= 0 && t <= time_step_) {
-                    t_hit     = t;
-                    axis      = 'z';
-                    sign      = +1;
-                    Tw        = diffuse_wall_temperature_[4];
-                    scattered = true;
-                }
-            } else if (new_z > zw1 && is_diffuse_walls_[5]) {
-                const value_type t = (zw1 - z) / uz;
-                if (t >= 0 && t <= time_step_) {
-                    t_hit     = t;
-                    axis      = 'z';
-                    sign      = -1;
-                    Tw        = diffuse_wall_temperature_[5];
-                    scattered = true;
-                }
-            }
-        }
-
-        if (!scattered) {
-            particles_.x[p] = new_x;
-            particles_.y[p] = new_y;
-            particles_.z[p] = new_z;
-
-        } else {
-            // точка удара
-            x += ux * t_hit;
-            y += uy * t_hit;
-            z += uz * t_hit;
-
-            std::tie(ux, uy, uz) = scatterDiffuse(axis, sign, Tw, particles_.m, gen_);
-
-            const value_type dt2 = time_step_ - t_hit;
-
-            x += ux * dt2;
-            y += uy * dt2;
-            z += uz * dt2;
-
-            particles_.x[p]  = x;
-            particles_.y[p]  = y;
-            particles_.z[p]  = z;
-
-            particles_.ux[p] = ux;
-            particles_.uy[p] = uy;
-            particles_.uz[p] = uz;
+    for (size_type c{}; c < cells_.size(); ++c) {
+        auto particles_in_cell = cell_list_.getParticlesInCell(c);
+        if (walls_.empty()) mover(particles_, particles_in_cell, time_step_);
+        for (auto& wall : walls_) {
+            wall->collide(particles_, particles_in_cell, time_step_);
+            wall->move(time_step_);
         }
     }
 
@@ -281,56 +190,9 @@ void mf::Domain::collideParticles() {
     std::normal_distribution<double>           normal(0., 1.);
     value_type                                 Navg = {};
     for (size_type c{}; c < cells_.size(); ++c) {
-        auto       particles_in_cell = cell_list_.getParticlesInCell(c);
-        const auto Np                = particles_in_cell.size();
-        Navg += Np;
-        if (Np < 2) continue;  // пропускаем ячейки с <2 частицами
-        const auto collision_rate = sigma_g_max_ / cells_[c].volume();
-        // Вычисляем число сталкивающихся частиц
-        const auto                               N_avg      = Np;
-        const auto                               N_coll_avg = 0.5 * Np * N_avg * particles_.W * collision_rate * time_step_;
-        std::poisson_distribution<size_type>     poisson(N_coll_avg);
-        const auto                               N_coll = poisson(gen_);
-        std::uniform_int_distribution<size_type> rand_index(0, Np - 1);
-        for (size_type collision{}; collision < N_coll; ++collision) {
-            const auto i   = particles_in_cell[rand_index(gen_)];
-            auto       tmp = particles_in_cell[rand_index(gen_)];
-            while (tmp == i) {
-                tmp = particles_in_cell[rand_index(gen_)];
-            }
-            const auto j = tmp;
-            // Вычисляем относительную скорость
-            const auto dux      = particles_.ux[i] - particles_.ux[j];
-            const auto duy      = particles_.uy[i] - particles_.uy[j];
-            const auto duz      = particles_.uz[i] - particles_.uz[j];
-            const auto gij_2    = dux * dux + duy * duy + duz * duz;
-            const auto gij      = std::sqrt(gij_2);
-            const auto half_gij = 0.5 * gij;
-            const auto sigma_g  = particles_.sigma(gij) * gij;
-            if (sigma_g > sigma_g_max_) sigma_g_max_ = sigma_g;
-            if (u01(gen_) < sigma_g / sigma_g_max_) {  // Принимаем столкновения с вероятностью
-                /// Считаем скорость центра масс
-                const auto ucm_x = 0.5 * (particles_.ux[i] + particles_.ux[j]);
-                const auto ucm_y = 0.5 * (particles_.uy[i] + particles_.uy[j]);
-                const auto ucm_z = 0.5 * (particles_.uz[i] + particles_.uz[j]);
-                /// Выбираем случайное направление
-                auto       nx   = normal(gen_);
-                auto       ny   = normal(gen_);
-                auto       nz   = normal(gen_);
-                const auto norm = std::sqrt(nx * nx + ny * ny + nz * nz);
-                nx /= norm;
-                ny /= norm;
-                nz /= norm;
-                /// Обновляем скорости
-                particles_.ux[i] = ucm_x + half_gij * nx;
-                particles_.uy[i] = ucm_y + half_gij * ny;
-                particles_.uz[i] = ucm_z + half_gij * nz;
-
-                particles_.ux[j] = ucm_x - half_gij * nx;
-                particles_.uy[j] = ucm_y - half_gij * ny;
-                particles_.uz[j] = ucm_z - half_gij * nz;
-            }
-        }
+        auto particles_in_cell = cell_list_.getParticlesInCell(c);
+        Navg += particles_in_cell.size();
+        sigma_g_max_ = collider(particles_, particles_in_cell, cells_[c].volume(), time_step_, sigma_g_max_, gen_);
     }
     const auto stop = std::chrono::high_resolution_clock::now();
     stats_.addStat("t_coll [ms]", std::chrono::duration<value_type, std::milli>(stop - start).count());
@@ -371,20 +233,22 @@ void mf::Domain::computeFlowProperties() {
         const std::size_t N             = particles_ids.size();
 
         if (N == 0) {
-            flow_properties_.n_density[c] = 0.0;
+            flow_properties_.n_particles[c] = 0.0;
 
-            flow_properties_.ux[c]        = 0.0;
-            flow_properties_.uy[c]        = 0.0;
-            flow_properties_.uz[c]        = 0.0;
+            flow_properties_.n_density[c]   = 0.0;
 
-            flow_properties_.u2x[c]       = 0.0;
-            flow_properties_.u2y[c]       = 0.0;
-            flow_properties_.u2z[c]       = 0.0;
+            flow_properties_.ux[c]          = 0.0;
+            flow_properties_.uy[c]          = 0.0;
+            flow_properties_.uz[c]          = 0.0;
 
-            flow_properties_.Ttrx[c]      = 0.0;
-            flow_properties_.Ttry[c]      = 0.0;
-            flow_properties_.Ttrz[c]      = 0.0;
-            flow_properties_.Ttr[c]       = 0.0;
+            flow_properties_.u2x[c]         = 0.0;
+            flow_properties_.u2y[c]         = 0.0;
+            flow_properties_.u2z[c]         = 0.0;
+
+            flow_properties_.Ttrx[c]        = 0.0;
+            flow_properties_.Ttry[c]        = 0.0;
+            flow_properties_.Ttrz[c]        = 0.0;
+            flow_properties_.Ttr[c]         = 0.0;
 
             continue;
         }
@@ -406,25 +270,27 @@ void mf::Domain::computeFlowProperties() {
             u2z += vz * vz;
         }
 
-        const value_type invN         = 1.0 / static_cast<value_type>(N);
+        const value_type invN           = 1.0 / static_cast<value_type>(N);
 
-        const value_type ux_m         = ux * invN;
-        const value_type uy_m         = uy * invN;
-        const value_type uz_m         = uz * invN;
+        const value_type ux_m           = ux * invN;
+        const value_type uy_m           = uy * invN;
+        const value_type uz_m           = uz * invN;
 
-        const value_type u2x_m        = u2x * invN;
-        const value_type u2y_m        = u2y * invN;
-        const value_type u2z_m        = u2z * invN;
+        const value_type u2x_m          = u2x * invN;
+        const value_type u2y_m          = u2y * invN;
+        const value_type u2z_m          = u2z * invN;
 
-        flow_properties_.n_density[c] = N * particles_.W / cells_[c].volume();
+        flow_properties_.n_particles[c] = N;
 
-        flow_properties_.ux[c]        = ux_m;
-        flow_properties_.uy[c]        = uy_m;
-        flow_properties_.uz[c]        = uz_m;
+        flow_properties_.n_density[c]   = N * particles_.W / cells_[c].volume();
 
-        flow_properties_.u2x[c]       = u2x_m;
-        flow_properties_.u2y[c]       = u2y_m;
-        flow_properties_.u2z[c]       = u2z_m;
+        flow_properties_.ux[c]          = ux_m;
+        flow_properties_.uy[c]          = uy_m;
+        flow_properties_.uz[c]          = uz_m;
+
+        flow_properties_.u2x[c]         = u2x_m;
+        flow_properties_.u2y[c]         = u2y_m;
+        flow_properties_.u2z[c]         = u2z_m;
 
         // ВАЖНО: дисперсия
         const value_type cx2     = u2x_m - ux_m * ux_m;
@@ -442,11 +308,6 @@ void mf::Domain::computeFlowProperties() {
 void mf::Domain::printStatsHeader() { stats_.printHeader(); }
 
 void mf::Domain::printStats(value_type time) { stats_.printStats(time); }
-
-void mf::Domain::setDiffuseWall(size_type side, value_type Tw) {
-    is_diffuse_walls_[side]         = true;
-    diffuse_wall_temperature_[side] = Tw;
-}
 
 void mf::Domain::writeVTU(std::string file_name) const {
     std::ofstream out(file_name);
@@ -579,3 +440,5 @@ void mf::Domain::writeVTU(std::string file_name) const {
 auto mf::Domain::getTimeStep() const noexcept -> value_type { return time_step_; }
 
 void mf::Domain::writeXProfile(std::string file_name) { xprofiler_(file_name, n_cells_x_, n_cells_y_, n_cells_z_, cell_size_); }
+
+void mf::Domain::addWall(std::shared_ptr<Wall> wall) { walls_.emplace_back(wall); }

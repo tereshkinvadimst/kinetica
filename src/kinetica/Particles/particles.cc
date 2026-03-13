@@ -41,3 +41,17 @@ void mf::Particles::killParticle(size_type i) { is_alive[i] = 1; }
 auto mf::Particles::sigma([[maybe_unused]] value_type gij) const noexcept -> value_type {
     return std::numbers::pi * molecule_size * molecule_size;
 }
+
+void mf::Particles::addParticles(size_type n_particles) {
+    const size_type n_old = getNParticles();
+    const size_type n_new = n_old + n_particles;
+
+    x.resize(n_new);
+    y.resize(n_new);
+    z.resize(n_new);
+    ux.resize(n_new);
+    uy.resize(n_new);
+    uz.resize(n_new);
+    cell_id.resize(n_new);
+    is_alive.resize(n_new, 1);
+}

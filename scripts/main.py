@@ -1,7 +1,7 @@
 import kinetica as kt
 
 MOLECULE_MASS = 6.63e-26 # Масса молекулы [кг]
-FN            = 1e3       # Число реальных молекул на одну модельную частицу
+FN            = 1e2       # Число реальных молекул на одну модельную частицу
 MOLECULE_SIZE = 3.6e-10  # Размер атома аргона [м]
 N_DENSITY     = 2.4e24   # Числовая плотность молекул [м^-3]
 T_INI         = 300      # Начальная температура системы [K]
@@ -15,40 +15,45 @@ NCX           = int(LX / LCX)                       # Число ячеек по
 NCY           = int(LY / LCY)                       # Число ячеек по y
 NCZ           = int(LZ / LCZ)                       # Число ячеек по z
 DT            = 1e-13    # Временной шаг моделирования [с]
-TOTAL_TIME    = 5       # Полное время моделирования [с]
+TOTAL_TIME    = 1       # Полное время моделирования [с]
 TC            = 270     # Температура холодной стенки
 TH            = 370      # Температура горячей стенки
 
+N_DENSITY_L   = 2.4e24
+N_DENSITY_R   = 2.4e24
+T_L           = 4800
+T_R           = 48
+
 def main():
-    domain_box = kt.Box(-LX/2, -LY/2, -LZ/2, LX, LY, LZ)
-    domain = kt.Domain(domain_box, MOLECULE_MASS, FN, MOLECULE_SIZE, 0.4)
-    domain.generateParticles(N_DENSITY, T_INI)
+    domain_box = kt.Box(0., 0., 0., LX, LY, LZ)
+    domain = kt.Domain(domain_box, MOLECULE_MASS, FN, MOLECULE_SIZE, 0.5)
+    domain.generateParticles(N_DENSITY_L, T_L, 0, LX / 2)
+    domain.generateParticles(N_DENSITY_R, T_R, LX / 2, LX)
+    
     print(f"time step is {domain.getTimeStep()}")
     #domain.saveXYZ("init.xyz")
     domain.generateMesh()
     domain.makeCellList()
 
-    domain.setDiffuseWall(0, TC)
-    domain.setDiffuseWall(1, TH)
-    #domain.setDiffuseWall(2, T_INI);
-    #domain.setDiffuseWall(3, T_INI);
+    domain.setDiffuseWall(0, T_L)
+    domain.setDiffuseWall(1, T_R)
     
     time: float  = 0
     counter: int = 0
     while(time < TOTAL_TIME):
-
-        if(counter % 1000 == 0):
-            domain.printStatsHeader()
-            domain.computeFlowProperties()
-            domain.writeXProfile(f"kinetica_{counter}.dat")
-        if(counter % 100 == 0):
-            domain.printStats(time)
 
         domain.moveParticles()
         domain.applyPeriodicBoundaries(False, True , True)
         domain.updateCellList()
         domain.collideParticles()
 
+
+        if(counter % 100 == 0):
+            domain.printStatsHeader()
+        if(counter % 10 == 0):
+            domain.computeFlowProperties()
+            domain.writeVTU(f"kinetica_{counter}.vtu")
+            domain.printStats(time)
            
         counter += 1
         time += domain.getTimeStep()

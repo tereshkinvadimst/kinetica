@@ -6,6 +6,7 @@
 #include "kinetica/Boundaries/boundaries.hh"
 #include "kinetica/Box/box.hh"
 #include "kinetica/CellList/cell_list.hh"
+#include "kinetica/DSMC/wall.hh"
 #include "kinetica/Particles/particles.hh"
 #include "kinetica/Properties/flow_properties.hh"
 #include "kinetica/Properties/profiles.hh"
@@ -21,7 +22,7 @@ class Domain {
 
     explicit Domain(Box domain_box, value_type m, value_type W, value_type molecule_size, value_type scale_factor);
 
-    void generateParticles(value_type n_density, value_type T);
+    void generateParticles(value_type n_density, value_type T, value_type x_min, value_type x_max);
     void generateMesh();
     void makeCellList();
     void updateCellList();
@@ -32,7 +33,7 @@ class Domain {
     void computeFlowProperties();
     void printStatsHeader();
     void printStats(value_type time);
-    void setDiffuseWall(size_type side, value_type Tw);
+    void addWall(std::shared_ptr<Wall> wall);
     void writeVTU(std::string file_name) const;
     auto getTimeStep() const noexcept -> value_type;
     void writeXProfile(std::string file_name);
@@ -41,25 +42,24 @@ class Domain {
     auto cellIndex(double x, double y, double z) -> size_type const;
 
    private:
-    random                    gen_;
-    Box                       domain_box_;
-    Particles                 particles_;
-    size_type                 n_cells_x_;
-    size_type                 n_cells_y_;
-    size_type                 n_cells_z_;
-    value_type                sigma_g_max_;
-    std::vector<Box>          cells_;
-    FlowProperties            flow_properties_;
-    CellList                  cell_list_;
-    Stats                     stats_;
-    std::array<bool, 6>       is_diffuse_walls_;
-    std::array<value_type, 6> diffuse_wall_temperature_;
-    value_type                lambda_;
-    value_type                time_step_;
-    value_type                cell_size_;
-    value_type                scale_factor_;
-    value_type                max_velocity_;
-    XProfiler                 xprofiler_;
+    random                             gen_;
+    Box                                domain_box_;
+    Particles                          particles_;
+    size_type                          n_cells_x_;
+    size_type                          n_cells_y_;
+    size_type                          n_cells_z_;
+    value_type                         sigma_g_max_;
+    std::vector<Box>                   cells_;
+    FlowProperties                     flow_properties_;
+    CellList                           cell_list_;
+    Stats                              stats_;
+    value_type                         lambda_;
+    value_type                         time_step_;
+    value_type                         cell_size_;
+    value_type                         scale_factor_;
+    value_type                         max_velocity_;
+    XProfiler                          xprofiler_;
+    std::vector<std::shared_ptr<Wall>> walls_;
 };
 
 }  // namespace mf

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 # Настройки проекта
-set(PYTHON_VERSION 3.14.3)
+set(PYTHON_VERSION 3.13.1)
 
 message(STATUS "CMAKE_CXX_COMPILER   = ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_TOOLCHAIN_FILE = ${CMAKE_TOOLCHAIN_FILE}")
@@ -78,6 +78,11 @@ nanobind_add_module(
     src/kinetica/Properties/stats.hh
     src/kinetica/Properties/stats.cc
     src/kinetica/DSMC/mover.hh
+    src/kinetica/DSMC/mover.cc
+    src/kinetica/DSMC/collider.hh
+    src/kinetica/DSMC/collider.cc
+    src/kinetica/DSMC/wall.hh
+    src/kinetica/DSMC/wall.cc
     src/kinetica/DSMC/utils.hh
     src/kinetica/Properties/profiles.hh
     src/kinetica/Properties/profiles.cc

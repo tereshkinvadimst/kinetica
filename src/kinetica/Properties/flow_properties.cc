@@ -1,7 +1,8 @@
 #include "kinetica/Properties/flow_properties.hh"
 
 mf::FlowProperties::FlowProperties(size_type N_cells)
-    : n_density(N_cells)
+    : n_particles(N_cells)
+    , n_density(N_cells)
     , ux(N_cells)
     , uy(N_cells)
     , uz(N_cells)

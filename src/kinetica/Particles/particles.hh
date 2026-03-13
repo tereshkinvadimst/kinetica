@@ -16,6 +16,8 @@ struct Particles final {
 
     [[nodiscard]] auto getNParticles() const noexcept -> size_type;
 
+    void               addParticles(size_type n_particles);
+
     [[nodiscard]] auto isAlive(size_type i) const -> bool;
     void               killParticle(size_type i);
 

@@ -1,3 +1,3 @@
-from ._kinetica import Box, Domain
+from ._kinetica import Box, Domain, Wall, DiffuseWall
 
 __all__ = ["Box", "Domain"]

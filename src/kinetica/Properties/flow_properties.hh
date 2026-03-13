@@ -12,6 +12,7 @@ struct FlowProperties final {
     FlowProperties() = default;
     explicit FlowProperties(size_type N_cells);
 
+    std::vector<size_type> n_particles;
     std::vector<value_type> n_density;
     std::vector<value_type> ux;
     std::vector<value_type> uy;

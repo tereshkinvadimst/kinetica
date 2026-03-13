@@ -2,6 +2,7 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/array.h>
+#include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
 
 #include "kinetica/Box/box.hh"
@@ -49,7 +50,7 @@ NB_MODULE(_kinetica, m) {
              "scale_factor"_a)
 
         // Методы для генерации частиц и сетки
-        .def("generateParticles", &mf::Domain::generateParticles, "n_density"_a, "T"_a)
+        .def("generateParticles", &mf::Domain::generateParticles, "n_density"_a, "T"_a, "x_min"_a, "x_max"_a)
         .def("generateMesh", &mf::Domain::generateMesh)
         .def("makeCellList", &mf::Domain::makeCellList)
         .def("updateCellList", &mf::Domain::updateCellList)
@@ -60,8 +61,27 @@ NB_MODULE(_kinetica, m) {
         .def("computeFlowProperties", &mf::Domain::computeFlowProperties)
         .def("printStatsHeader", &mf::Domain::printStatsHeader)
         .def("printStats", &mf::Domain::printStats, "time"_a)
-        .def("setDiffuseWall", &mf::Domain::setDiffuseWall, "side"_a, "Tw"_a)
         .def("writeVTU", &mf::Domain::writeVTU, "file_name"_a)
         .def("getTimeStep", &mf::Domain::getTimeStep)
-        .def("writeXProfile", &mf::Domain::writeXProfile, "file_name"_a);
+        .def("writeXProfile", &mf::Domain::writeXProfile, "file_name"_a)
+        .def("addWall", &mf::Domain::addWall, "wall"_a);
+
+    // --- Wall ---
+    nb::class_<mf::Wall>(m, "Wall")
+        .def(nb::init<mf::Wall::Vector3, mf::Wall::Vector3, mf::Wall::Vector2, mf::Wall::Vector3, mf::Wall::value_type>(),
+             "position"_a,
+             "normal"_a,
+             "size"_a,
+             "velocity"_a = mf::Wall::Vector3::Zero(),
+             "Tw"_a       = mf::Wall::value_type{})
+        .def("setVelocity", &mf::Wall::setVelocity, "velocity"_a);
+
+    // --- DiffuseWall ---
+    nb::class_<mf::DiffuseWall, mf::Wall>(m, "DiffuseWall")
+        .def(nb::init<mf::Wall::Vector3, mf::Wall::Vector3, mf::Wall::Vector2, mf::Wall::Vector3, mf::Wall::value_type>(),
+             "position"_a,
+             "normal"_a,
+             "size"_a,
+             "velocity"_a,
+             "Tw"_a);
 }

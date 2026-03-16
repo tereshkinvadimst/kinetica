@@ -1,7 +1,9 @@
 #include "kinetica/DSMC/wall.hh"
 
 #include <algorithm>
+#include <cmath>
 #include <execution>
+#include <limits>
 
 #include "kinetica/constants.hh"
 
@@ -41,50 +43,39 @@ auto mf::Wall::timeTo(const Particles& particles, size_type i) const -> value_ty
     return t;
 }
 
-
-void mf::Wall::collide(Particles& particles, std::span<const size_type> particles_id, value_type dt) const {
-    specularReflection(particles, particles_id, dt);
+void mf::Wall::collide(Particles& particles, size_type id, value_type& time_remain) const {
+    specularReflection(particles, id, time_remain);
 }
 
-void mf::Wall::specularReflection(Particles& particles, std::span<const size_type> particles_id, value_type dt) const {
-    std::for_each(
-        std::execution::unseq, particles_id.begin(), particles_id.end(), [dt, &particles, this](Particles::size_type id) {
-            if (!particles.isAlive(id)) return;
-            // Вычисляем время до столкновения
-            const auto t_wall  = timeTo(particles, id);
-            const auto dt_wall = dt - t_wall;
-            // если столкновения в этом шаге нет
-            if (t_wall > dt) {
-                particles.x[id] += particles.ux[id] * dt;
-                particles.y[id] += particles.uy[id] * dt;
-                particles.z[id] += particles.uz[id] * dt;
-                return;
-            }
-            // движение до стенки
-            particles.x[id] += particles.ux[id] * t_wall;
-            particles.y[id] += particles.uy[id] * t_wall;
-            particles.z[id] += particles.uz[id] * t_wall;
+void mf::Wall::specularReflection(Particles& particles, size_type id, value_type& time_remain) const {
+    if (!particles.isAlive(id)) return;
+    // Вычисляем время до столкновения
+    const auto t_wall  = timeTo(particles, id);
+    const auto dt_wall = time_remain - t_wall;
+    // если стенка слишком далеко, то просто пропускаем
+    if (t_wall > time_remain) {
+        return;
+    }
+    // В другом случае перемещаем частицу к стенке
+    particles.x[id] += particles.ux[id] * t_wall;
+    particles.y[id] += particles.uy[id] * t_wall;
+    particles.z[id] += particles.uz[id] * t_wall;
 
-            const auto dt_remain = dt - t_wall;
+    // Вычисляем скорость после отражения
+    const Vector3    v{particles.ux[id], particles.uy[id], particles.uz[id]};
 
-            // отражение
-            const Vector3    v{particles.ux[id], particles.uy[id], particles.uz[id]};
+    const Vector3    v_rel = v - velocity_;
 
-            const Vector3    v_rel = v - velocity_;
+    const value_type dot   = v_rel.dot(plane_.normal());
 
-            const value_type dot   = v_rel.dot(plane_.normal());
+    const Vector3    v_new = v_rel - value_type{2} * dot * plane_.normal() + velocity_;
+    // Записываем скорость после отражения
+    particles.ux[id] = v_new.x();
+    particles.uy[id] = v_new.y();
+    particles.uz[id] = v_new.z();
 
-            const Vector3    v_new = v_rel - value_type{2} * dot * plane_.normal() + velocity_;
-
-            particles.ux[id]       = v_new.x();
-            particles.uy[id]       = v_new.y();
-            particles.uz[id]       = v_new.z();
-
-            // движение после столкновения
-            particles.x[id] += particles.ux[id] * dt_remain;
-            particles.y[id] += particles.uy[id] * dt_remain;
-            particles.z[id] += particles.uz[id] * dt_remain;
-        });
+    // Вычисляем оставшееся время после столкновения
+    const auto dt_remain = time_remain - t_wall;
 }
 
 void mf::Wall::setVelocity(Vector3 velocity) { velocity_ = velocity; }
@@ -94,34 +85,65 @@ void mf::Wall::move(value_type dt) {
     plane_ = Plane(plane_.normal(), center_);
 }
 
+auto mf::Wall::intersects(const Box& cell) const noexcept -> bool {
+    const auto&   n        = plane_.normal();
+
+    const Vector3 verts[8] = {
+        {cell.x0, cell.y0, cell.z0},
+        {cell.x0 + cell.Lx, cell.y0, cell.z0},
+        {cell.x0, cell.y0 + cell.Ly, cell.z0},
+        {cell.x0, cell.y0, cell.z0 + cell.Lz},
+        {cell.x0 + cell.Lx, cell.y0 + cell.Ly, cell.z0},
+        {cell.x0 + cell.Lx, cell.y0, cell.z0 + cell.Lz},
+        {cell.x0, cell.y0 + cell.Ly, cell.z0 + cell.Lz},
+        {cell.x0 + cell.Lx, cell.y0 + cell.Ly, cell.z0 + cell.Lz},
+    };
+
+    value_type min_d = std::numeric_limits<value_type>::max();
+    value_type max_d = -std::numeric_limits<value_type>::max();
+
+    for (const auto& p : verts) {
+        const auto d = n.dot(p - center_);
+        min_d        = std::min(min_d, d);
+        max_d        = std::max(max_d, d);
+    }
+
+    if (min_d > 0 || max_d < 0) return false;
+
+    const Vector3    cell_center(cell.cx(), cell.cy(), cell.cz());
+
+    const Vector3    proj    = cell_center - n * n.dot(cell_center - center_);
+
+    const Vector3    d       = proj - center_;
+
+    const value_type u_coord = d.dot(axis1_);
+    const value_type v_coord = d.dot(axis2_);
+
+    return std::abs(u_coord) <= value_type{0.5} * size_.x() && std::abs(v_coord) <= value_type{0.5} * size_.y();
+}
+
+auto mf::Wall::getCenterPosition() const noexcept -> Vector3 { return center_; }
+
+auto mf::Wall::getVelocity() const noexcept -> Vector3 { return velocity_; }
+
 mf::DiffuseWall::DiffuseWall(Vector3 position, Vector3 normal, Vector2 size, Vector3 velocity, value_type Tw)
     : Wall(position, normal, size, velocity), Tw_(Tw) {}
 
-void mf::DiffuseWall::collide(Particles& particles, std::span<const size_type> particles_id, value_type dt, random& gen) const {
-    std::for_each(std::execution::unseq, particles_id.begin(), particles_id.end(), [&](size_type id) {
-        const auto t_wall = timeTo(particles, id);
+void mf::DiffuseWall::collide(Particles& particles, size_type id, value_type& time_remain, random& gen) const {
+    const auto t_wall = timeTo(particles, id);
 
-        if (t_wall > dt) {
-            particles.x[id] += particles.ux[id] * dt;
-            particles.y[id] += particles.uy[id] * dt;
-            particles.z[id] += particles.uz[id] * dt;
-            return;
-        }
+    if (t_wall > time_remain) {
+        return;
+    }
 
-        // движение до стенки
-        particles.x[id] += particles.ux[id] * t_wall;
-        particles.y[id] += particles.uy[id] * t_wall;
-        particles.z[id] += particles.uz[id] * t_wall;
+    // движение до стенки
+    particles.x[id] += particles.ux[id] * t_wall;
+    particles.y[id] += particles.uy[id] * t_wall;
+    particles.z[id] += particles.uz[id] * t_wall;
 
-        const auto dt_remain = dt - t_wall;
+    time_remain = time_remain - t_wall;
 
-        diffuseReflection(particles, id, gen);
-
-        // движение после столкновения
-        particles.x[id] += particles.ux[id] * dt_remain;
-        particles.y[id] += particles.uy[id] * dt_remain;
-        particles.z[id] += particles.uz[id] * dt_remain;
-    });
+    diffuseReflection(particles, id, gen);
 }
 
 void mf::DiffuseWall::diffuseReflection(Particles& particles, size_type id, random& gen) const {

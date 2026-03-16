@@ -19,7 +19,8 @@
 #include "kinetica/init/generate_velocities.hh"
 #include "version.hh"
 
-mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecule_size, value_type scale_factor)
+mf::Domain::Domain(
+    Box domain_box, value_type m, value_type W, value_type molecule_size, value_type scale_factor, value_type time_scale_factor)
     : gen_{std::random_device{}()}
     , domain_box_(domain_box)
     , particles_{}
@@ -37,7 +38,8 @@ mf::Domain::Domain(Box domain_box, value_type m, value_type W, value_type molecu
     , scale_factor_{scale_factor}
     , max_velocity_{}
     , xprofiler_(&domain_box_, &flow_properties_)
-    , walls_{} {
+    , walls_{}
+    , time_scale_factor_{time_scale_factor} {
     particles_.m             = m;
     particles_.W             = W;
     particles_.molecule_size = molecule_size;
@@ -86,12 +88,8 @@ void mf::Domain::generateParticles(value_type n_density, value_type T, value_typ
     generateMaxwellVelocity(std::span{particles_.uy.data() + old_size, Np}, velocity_scale_factor, gen_);
     generateMaxwellVelocity(std::span{particles_.uz.data() + old_size, Np}, velocity_scale_factor, gen_);
 
-    const auto max_velocity_x        = std::max_element(particles_.ux.begin(), particles_.ux.end());
-    const auto max_velocity_y        = std::max_element(particles_.uy.begin(), particles_.uy.end());
-    const auto max_velocity_z        = std::max_element(particles_.uz.begin(), particles_.uz.end());
-    max_velocity_                    = std::sqrt((*max_velocity_x) * (*max_velocity_x) + (*max_velocity_y) * (*max_velocity_y) +
-                              (*max_velocity_z) * (*max_velocity_z));
-    const value_type new_time_step   = computeTimeStep(lambda_, max_velocity_, scale_factor_);
+    computeMaxVelocity();
+    const value_type new_time_step   = computeTimeStep(scale_factor_ * lambda_, max_velocity_, time_scale_factor_);
     const value_type new_sigma_g_max = particles_.sigma(2. * max_velocity_) * max_velocity_;
     if (new_time_step < time_step_) {
         time_step_ = new_time_step;
@@ -169,14 +167,46 @@ void mf::Domain::applyPeriodicBoundaries(bool px, bool py, bool pz) { applyPerio
 
 void mf::Domain::moveParticles() {
     const auto start = std::chrono::high_resolution_clock::now();
-
+    // Вычисляем новый шаг по времени
+    computeMaxVelocity();
+    // Вычисляем длину свободного пробега
+    const value_type new_time_step   = computeTimeStep(scale_factor_ * lambda_, max_velocity_, time_scale_factor_);
+    const value_type new_sigma_g_max = particles_.sigma(2. * max_velocity_) * max_velocity_;
+    if (new_time_step < time_step_) {
+        time_step_ = new_time_step;
+    }
+    if (new_sigma_g_max > sigma_g_max_) {
+        sigma_g_max_ = new_sigma_g_max;
+    }
+    // Перемещаем частицы
     for (size_type c{}; c < cells_.size(); ++c) {
         auto particles_in_cell = cell_list_.getParticlesInCell(c);
-        if (walls_.empty()) mover(particles_, particles_in_cell, time_step_);
-        for (auto& wall : walls_) {
-            wall->collide(particles_, particles_in_cell, time_step_);
-            wall->move(time_step_);
+        // Если стенок нет!
+        if (walls_.empty()) {
+            mover(particles_, particles_in_cell, time_step_);
+            continue;
         }
+        bool has_walls   = false;
+        auto time_remain = time_step_;
+        for (const auto id : particles_in_cell) {   // Цикл по всем частицам в ячейке
+            for (auto& wall : walls_) {             // Цикл по всем стенкам
+                if (wall->intersects(cells_[c])) {  // Проверяем, что стенка пересекает ячейку
+                    wall->collide(particles_, id, time_remain);
+                }
+            }
+            // Перемещаем частицу за оставшееся время
+            particles_.x[id] += particles_.ux[id] * time_remain;
+            particles_.y[id] += particles_.uy[id] * time_remain;
+            particles_.z[id] += particles_.uz[id] * time_remain;
+        }
+
+        // Если стенок в ячейках нет, то просто перемещаем частицы
+        if (!has_walls) mover(particles_, particles_in_cell, time_step_);
+    }
+
+    // Перемещаем стенки
+    for (auto& wall : walls_) {
+        wall->move(time_step_);
     }
 
     const auto stop = std::chrono::high_resolution_clock::now();
@@ -442,3 +472,27 @@ auto mf::Domain::getTimeStep() const noexcept -> value_type { return time_step_;
 void mf::Domain::writeXProfile(std::string file_name) { xprofiler_(file_name, n_cells_x_, n_cells_y_, n_cells_z_, cell_size_); }
 
 void mf::Domain::addWall(std::shared_ptr<Wall> wall) { walls_.emplace_back(wall); }
+
+void mf::Domain::computeMaxVelocity() {
+    // Максимальный модуль скорости по каждой координате
+    double max_ux = *std::max_element(
+        particles_.ux.begin(), particles_.ux.end(), [](double a, double b) { return std::abs(a) < std::abs(b); });
+    double max_uy = *std::max_element(
+        particles_.uy.begin(), particles_.uy.end(), [](double a, double b) { return std::abs(a) < std::abs(b); });
+    double max_uz = *std::max_element(
+        particles_.uz.begin(), particles_.uz.end(), [](double a, double b) { return std::abs(a) < std::abs(b); });
+
+    // Максимальная скорость частицы в системе
+    const auto particle_max_velocity = std::sqrt(max_ux * max_ux + max_uy * max_uy + max_uz * max_uz);
+
+    value_type wall_max_velocity     = {};
+
+    for (const auto& wall : walls_) {
+        const auto& v     = wall->getVelocity();  // v — std::array<double,3> или Eigen::Vector3d
+        double      vnorm = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        if (vnorm > wall_max_velocity) wall_max_velocity = vnorm;
+    }
+
+    // --- 3. Общая максимальная скорость в системе ---
+    max_velocity_ = std::max(particle_max_velocity, wall_max_velocity);
+}

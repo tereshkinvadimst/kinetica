@@ -42,12 +42,13 @@ NB_MODULE(_kinetica, m) {
 
     // --- Domain ---
     nb::class_<mf::Domain>(m, "Domain")
-        .def(nb::init<mf::Box, double, double, double, double>(),
+        .def(nb::init<mf::Box, double, double, double, double, double>(),
              "domain_box"_a,
              "mass"_a,
              "W"_a,
              "molecule_size"_a,
-             "scale_factor"_a)
+             "scale_factor"_a,
+             "time_scale_factor"_a)
 
         // Методы для генерации частиц и сетки
         .def("generateParticles", &mf::Domain::generateParticles, "n_density"_a, "T"_a, "x_min"_a, "x_max"_a)
@@ -74,7 +75,8 @@ NB_MODULE(_kinetica, m) {
              "size"_a,
              "velocity"_a = mf::Wall::Vector3::Zero(),
              "Tw"_a       = mf::Wall::value_type{})
-        .def("setVelocity", &mf::Wall::setVelocity, "velocity"_a);
+        .def("setVelocity", &mf::Wall::setVelocity, "velocity"_a)
+        .def("getCenterPosition", &mf::Wall::getCenterPosition);
 
     // --- DiffuseWall ---
     nb::class_<mf::DiffuseWall, mf::Wall>(m, "DiffuseWall")

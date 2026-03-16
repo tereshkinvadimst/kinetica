@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include <span>
 
+#include "kinetica/Box/box.hh"
 #include "kinetica/Particles/particles.hh"
 #include "kinetica/Random/random.hh"
 
@@ -21,18 +22,23 @@ class Wall {
     Wall(Vector3 position, Vector3 normal, Vector2 size, Vector3 velocity = Vector3::Zero(), value_type Tw = {});
     virtual ~Wall() = default;
 
-    void collide(Particles& particles, std::span<const size_type> particles_id, value_type dt) const;
+    void               collide(Particles& particles, size_type id, value_type& time_remain) const;
 
-    void setVelocity(Vector3 velocity);
+    void               setVelocity(Vector3 velocity);
 
-    void move(value_type dt);
+    void               move(value_type dt);
+
+    auto               getCenterPosition() const noexcept -> Vector3;
+    auto               getVelocity() const noexcept -> Vector3;
+
+    [[nodiscard]] auto intersects(const Box& cell) const noexcept -> bool;
 
    protected:
     void compute_plane_axes();
 
     auto timeTo(const Particles& particles, size_type i) const -> value_type;
 
-    void specularReflection(Particles& particles, std::span<const size_type> particles_id, value_type dt) const;
+    void specularReflection(Particles& particles, size_type id, value_type& time_remain) const;
 
    protected:
     Plane   plane_;
@@ -47,7 +53,7 @@ class DiffuseWall final : public Wall {
    public:
     DiffuseWall(Vector3 position, Vector3 normal, Vector2 size, Vector3 velocity, value_type Tw);
 
-    void collide(Particles& particles, std::span<const size_type> particles_id, value_type dt, random& gen) const;
+    void collide(Particles& particles, size_type id, value_type& time_remain, random& gen) const;
 
    private:
     void diffuseReflection(Particles& particles, size_type id, random& gen) const;

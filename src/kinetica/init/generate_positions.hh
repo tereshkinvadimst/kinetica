@@ -17,8 +17,9 @@ inline void generateUniformPositions(R&&                           out,
 #ifndef NDEBUG
     assert(left <= right);
 #endif
+    constexpr T                       epsilon = 1e-12;
 
-    std::uniform_real_distribution<T> dist(left, right);
+    std::uniform_real_distribution<T> dist(left + epsilon, right);
 
     std::ranges::generate(out, [&gen, &dist]() noexcept { return dist(gen); });
 }

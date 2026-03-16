@@ -20,7 +20,12 @@ class Domain {
     using size_type  = std::size_t;
     using value_type = double;
 
-    explicit Domain(Box domain_box, value_type m, value_type W, value_type molecule_size, value_type scale_factor);
+    explicit Domain(Box        domain_box,
+                    value_type m,
+                    value_type W,
+                    value_type molecule_size,
+                    value_type scale_factor,
+                    value_type time_scale_factor);
 
     void generateParticles(value_type n_density, value_type T, value_type x_min, value_type x_max);
     void generateMesh();
@@ -41,6 +46,8 @@ class Domain {
    private:
     auto cellIndex(double x, double y, double z) -> size_type const;
 
+    void computeMaxVelocity();
+
    private:
     random                             gen_;
     Box                                domain_box_;
@@ -60,6 +67,7 @@ class Domain {
     value_type                         max_velocity_;
     XProfiler                          xprofiler_;
     std::vector<std::shared_ptr<Wall>> walls_;
+    value_type                         time_scale_factor_;
 };
 
 }  // namespace mf

@@ -17,6 +17,6 @@ add_executable(
 
 set_target_properties(
   kinetica
-  PROPERTIES Fortran_STANDARD 2018
-             Fortran_STANDARD_REQUIRED on
-             Fortran_EXTENSIONS off)
+  PROPERTIES Fortran_STANDARD 2023
+  Fortran_STANDARD_REQUIRED on
+  Fortran_EXTENSIONS off)

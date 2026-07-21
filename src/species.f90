@@ -18,6 +18,8 @@ module kinetica_species
     real(f64),allocatable,protected,public::molecule_size(:)
     !> Опорная температура молекулы (NSpecies)
     real(f64),allocatable,protected,public::reference_temperature(:)
+    !> Число частиц заданного компонента
+    integer(i32),allocatable,public::n_particles_species(:)
     
 
 contains
@@ -30,7 +32,6 @@ contains
         real(f64),intent(in),value::d_ref
         real(f64),intent(in),value::t_ref
 
-
         if (n_species == 0) then
             species_names         = [name]
             molar_mass            = [m]
@@ -38,6 +39,7 @@ contains
             alpha                 = [alpha_]
             molecule_size         = [d_ref]
             reference_temperature = [t_ref]
+            n_particles_species   = [0]
         else
             species_names         = [species_names, name]
             molar_mass            = [molar_mass, m]
@@ -45,6 +47,7 @@ contains
             alpha                 = [alpha, alpha_]
             molecule_size         = [molecule_size, d_ref]
             reference_temperature = [reference_temperature, t_ref]
+            n_particles_species   = [n_particles_species, 0]
         end if
 
         n_species = n_species + 1

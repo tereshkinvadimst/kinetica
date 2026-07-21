@@ -26,7 +26,7 @@ module kinetica_particles
 contains
 
     !> Сгенерировать частицы
-    subroutine generate_particles(weight, n_density, temperature, u_flow, s, pos_min, pos_max)
+    subroutine generate_particles(weight, n_density, temperature, u_flow, s, pos_min, pos_max, dt)
         use kinetica_random, only: poisson, gauss
         use kinetica_constants, only: r_gas
         use kinetica_species, only: molar_mass
@@ -44,12 +44,16 @@ contains
         real(f64),intent(in)::pos_min(3)
         !> Максимально положение области генерации частиц
         real(f64),intent(in)::pos_max(3)
+        !> Шаг по времени (опционален в случае перемещения частиц)
+        real(f64),intent(in),optional,value::dt
         !> размеры области
         real(f64)::l(3)
         !> Объём области
         real(f64)::volume
         !> Приблизительное число частиц 
         real(f64)::n_nearly
+        !> Случайное число на отрезке [0, 1)
+        real(f64)::rnumber
         !> Число частиц, которые нужно сгенерировать
         integer(i32)::n_generated
         !> Среднеквадратичная скорость
@@ -66,17 +70,24 @@ contains
         volume      = product(l)
         ! Вычисляем приблизительное число частиц в области
         n_nearly    = n_density * volume / weight
-        ! Вычисляем число частиц из распределения Пуассона
+        if(n_nearly > 20) then ! Если частиц много, то:
+            n_generated = int(n_nearly, i32)
+            call random_number(rnumber)
+            if(rnumber < n_nearly - real(n_generated, f64)) n_generated = n_generated + 1
+        else ! Вычисляем число частиц из распределения Пуассона:
         n_generated = poisson(n_nearly)
+        endif
         ! Вычисляем среднеквадратичную скорость
         u_avg = sqrt(3._f64 * r_gas * temperature / molar_mass(s))
     
         do p = 1, n_generated
             ! Генерируем равнораспределённое положение частицы
             call random_number(position)
-            position = position * l - pos_min
+            position = position * l + pos_min
             ! Генерируем скорость из распределения Гаусса
             velocity = u_flow + u_avg * gauss()
+            ! Если указан шаг по времени, то также перемещаем частицу
+            if(present(dt)) position = position + velocity * dt
             ! Добавляем частицу в конец
             call push_back_particle(position, velocity, s)
         end do
@@ -86,6 +97,7 @@ contains
 
     subroutine push_back_particle(position, velocity, s)
         use kinetica_utils, only: resize
+        use kinetica_species, only: n_particles_species
         real(f64),intent(in)::position(3)
         real(f64),intent(in)::velocity(3)
         integer(i32),intent(in),value::s
@@ -108,16 +120,18 @@ contains
 
         endif
 
-        r(:, new_size)    = position
-        u(:, new_size)    = velocity
-        species(new_size) = s
-        next(new_size)    = 0
-        prev(new_size)    = 0
-        n_particles       = new_size
-        capacity          = new_capacity
+        r(:, new_size)         = position
+        u(:, new_size)         = velocity
+        species(new_size)      = s
+        next(new_size)         = 0
+        prev(new_size)         = 0
+        n_particles            = new_size
+        capacity               = new_capacity
+        n_particles_species(s) = n_particles_species(s) + 1
     end subroutine push_back_particle
 
     subroutine kill_particle(i)
+        use kinetica_species, only: n_particles_species
         !> Указатель на частицу, которую нужно удалить
         integer(i32),intent(in),value::i
         !> Указатель на последнюю частицу в списке частиц
@@ -129,6 +143,9 @@ contains
         if (i < 1 .or. i > n_particles) return
 
         last = n_particles
+        ! Уменьшаем число частиц на 1
+        n_particles                     = n_particles - 1
+        n_particles_species(species(i)) = n_particles_species(species(i)) - 1
 
         p_i    = prev(i)
         n_i    = next(i)
@@ -154,8 +171,6 @@ contains
             if (p_last /= 0) next(p_last) = i
             if (n_last /= 0) prev(n_last) = i
         endif
-        ! Уменьшаем число частиц на 1
-        n_particles = n_particles - 1
     end subroutine kill_particle
     
 end module kinetica_particles

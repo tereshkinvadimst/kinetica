@@ -12,6 +12,11 @@ add_executable(
   src/particles.f90
   src/domain.f90
   src/collider.f90
+  src/boundary.f90
+  src/piston.f90
+  src/mover.f90
+  src/global.f90
+  src/init.f90
   src/xyz.f90
   src/kinetica.f90)
 
